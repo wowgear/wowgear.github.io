@@ -1,10 +1,17 @@
-const EXPANSIONS = [
-  { id: 'classic', label: 'Classic', enabled: false },
-  { id: 'tbc', label: 'TBC', enabled: true },
-  { id: 'wotlk', label: 'WotLK', enabled: false },
-] as const;
+import type { Expansion } from '../urlState.js';
 
-export function Navbar(): JSX.Element {
+interface Props {
+  expansion: Expansion;
+  onChange: (next: Expansion) => void;
+}
+
+const EXPANSIONS: ReadonlyArray<{ id: Expansion; label: string }> = [
+  { id: 'vanilla', label: 'Classic' },
+  { id: 'tbc', label: 'TBC' },
+  { id: 'wotlk', label: 'WotLK' },
+];
+
+export function Navbar({ expansion, onChange }: Props): JSX.Element {
   return (
     <header className="h-14 bg-panel2 border-b border-black/40 shrink-0">
       <div className="h-full max-w-6xl mx-auto px-6 flex items-center justify-between">
@@ -15,19 +22,22 @@ export function Navbar(): JSX.Element {
         </div>
 
         <nav className="flex items-center gap-1">
-          {EXPANSIONS.map((e) => (
-            <button
-              key={e.id}
-              disabled={!e.enabled}
-              className={`px-3 py-1.5 text-sm rounded transition ${
-                e.enabled
-                  ? 'bg-black/40 ring-1 ring-white/30 text-ink'
-                  : 'text-muted/60 cursor-not-allowed'
-              }`}
-            >
-              {e.label}
-            </button>
-          ))}
+          {EXPANSIONS.map((e) => {
+            const active = expansion === e.id;
+            return (
+              <button
+                key={e.id}
+                onClick={() => onChange(e.id)}
+                className={`px-3 py-1.5 text-sm rounded transition ${
+                  active
+                    ? 'bg-black/40 ring-1 ring-white/30 text-ink'
+                    : 'text-muted hover:text-ink hover:bg-black/20'
+                }`}
+              >
+                {e.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
     </header>

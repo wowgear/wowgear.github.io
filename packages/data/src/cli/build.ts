@@ -6,7 +6,19 @@ import { projectItems, shouldKeepItem, type ProjectedSource } from '../project.j
 import { createSchema } from '../schema.js';
 import { readWorldSources } from '../worldsource.js';
 
-function parseArgs(argv: string[]): { dump: string; thatsmybis: string | null; world: string | null; out: string } {
+export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
+
+const LEVEL_CAP: Record<Expansion, number> = { vanilla: 60, tbc: 70, wotlk: 80 };
+
+interface Args {
+  expansion: Expansion;
+  dump: string | null;
+  thatsmybis: string | null;
+  world: string | null;
+  out: string;
+}
+
+function parseArgs(argv: string[]): Args {
   const args = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -16,16 +28,21 @@ function parseArgs(argv: string[]): { dump: string; thatsmybis: string | null; w
       else { args.set(a.slice(2), argv[i + 1] ?? ''); i++; }
     }
   }
-  const dump = args.get('dump');
-  const defOut = resolve(import.meta.dir, '../../../../apps/ui/public/tbc.sqlite');
-  const out = args.get('out') ? resolve(args.get('out')!) : defOut;
-  const thatsmybis = args.get('thatsmybis') ?? null;
-  const world = args.get('world') ?? null;
-  if (!dump) {
-    console.error('Usage: bun run build.ts --dump <unmodified.sql|dir> [--world <cmangos-world.sql>] [--thatsmybis <dir>] [--out apps/ui/public/tbc.sqlite]');
+  const expansion = (args.get('expansion') ?? 'tbc') as Expansion;
+  if (!['vanilla', 'tbc', 'wotlk'].includes(expansion)) {
+    console.error(`invalid --expansion: ${expansion}`);
     process.exit(1);
   }
-  return { dump, thatsmybis, world, out };
+  const defOut = resolve(import.meta.dir, `../../../../apps/ui/public/${expansion}.sqlite`);
+  const out = args.get('out') ? resolve(args.get('out')!) : defOut;
+  const dump = args.get('dump') ?? null;
+  const thatsmybis = args.get('thatsmybis') ?? null;
+  const world = args.get('world') ?? null;
+  if (!dump && !world) {
+    console.error('Usage: bun run build.ts --expansion=<vanilla|tbc|wotlk> [--dump <items.sql>] [--world <cmangos-world.sql>] [--thatsmybis <dir>] [--out path]');
+    process.exit(1);
+  }
+  return { expansion, dump, thatsmybis, world, out };
 }
 
 interface ItemMeta {
@@ -48,6 +65,7 @@ function isTbcRaidLoot(id: number, itemLevel: number, quality: number): boolean 
 
 const PVP_NAME_PATTERNS: RegExp[] = [
   /^(Hateful|Merciless|Vengeful|Brutal|Gladiator's|Veteran's|Champion's) /,
+  /^(Savage|Deadly|Furious|Relentless|Wrathful) Gladiator's /,
   /^(High Warlord's|Warlord's|General's|Lieutenant General's|Centurion's|Legionnaire's|Stone Guard's|Blood Guard's|Senior Sergeant's|First Sergeant's|Sergeant's|Sergeant Major's|Sergeant) /,
   /^(Grand Marshal's|Field Marshal's|Marshal's|Knight-Captain's|Lieutenant Commander's|Knight-Lieutenant's|Knight's|Knight Champion's|Knight-Captain) /,
 ];
@@ -168,10 +186,12 @@ function readThatsmybisSources(dir: string, knownItems: Set<number>): ProjectedS
 }
 
 function main(): void {
-  const { dump, thatsmybis, world, out } = parseArgs(process.argv.slice(2));
+  const { expansion, dump, thatsmybis, world, out } = parseArgs(process.argv.slice(2));
+  console.log(`[ingest] expansion=${expansion} levelCap=${LEVEL_CAP[expansion]}`);
 
-  console.log(`[ingest] loading dump from ${dump}`);
-  const tables = loadDumpDir(dump);
+  const itemSrc = dump ?? world!;
+  console.log(`[ingest] loading items from ${itemSrc}`);
+  const tables = loadDumpDir(itemSrc);
   const itemTable = tables.get('items') ?? tables.get('item_template');
   if (!itemTable) {
     console.error(`[ingest] no 'items' or 'item_template' table found. Found: ${[...tables.keys()].join(', ')}`);
@@ -179,8 +199,11 @@ function main(): void {
   }
 
   console.log(`[ingest] parsed ${itemTable.rows.length} item rows`);
-  const items = projectItems(itemTable).filter(shouldKeepItem);
-  console.log(`[ingest] keeping ${items.length} items after prune`);
+  const all = projectItems(itemTable).filter(shouldKeepItem);
+  const expansionCutoff: Record<Expansion, number> = { vanilla: 24000, tbc: 36000, wotlk: Infinity };
+  const cutoff = expansionCutoff[expansion];
+  const items = all.filter((it) => it.id < cutoff && it.required_level <= LEVEL_CAP[expansion]);
+  console.log(`[ingest] keeping ${items.length} items after prune (cutoff id<${cutoff}, reqlvl<=${LEVEL_CAP[expansion]})`);
 
   const itemMeta = new Map<number, ItemMeta>();
   for (const it of items) itemMeta.set(it.id, { name: it.name, required_level: it.required_level, item_level: it.item_level, quality: it.quality });

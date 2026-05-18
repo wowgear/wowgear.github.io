@@ -1,5 +1,6 @@
 import type { Database, SqlJsStatic } from 'sql.js';
 import type { Item, ItemSource } from '@wowgear/core';
+import type { Expansion } from './urlState.js';
 
 const SQLJS_VERSION = '1.14.1';
 const SQLJS_CDN = `https://cdn.jsdelivr.net/npm/sql.js@${SQLJS_VERSION}/dist`;
@@ -10,11 +11,14 @@ declare global {
   }
 }
 
-let dbPromise: Promise<Database> | null = null;
+const dbCache = new Map<Expansion, Promise<Database>>();
 
-export function loadDb(): Promise<Database> {
-  if (!dbPromise) dbPromise = open();
-  return dbPromise;
+export function loadDb(expansion: Expansion): Promise<Database> {
+  const cached = dbCache.get(expansion);
+  if (cached) return cached;
+  const p = open(expansion);
+  dbCache.set(expansion, p);
+  return p;
 }
 
 function loadSqlJsScript(): Promise<void> {
@@ -28,14 +32,15 @@ function loadSqlJsScript(): Promise<void> {
   });
 }
 
-async function open(): Promise<Database> {
+async function open(expansion: Expansion): Promise<Database> {
   await loadSqlJsScript();
   if (!window.initSqlJs) throw new Error('initSqlJs missing after script load');
   const SQL = await window.initSqlJs({
     locateFile: (file) => `${SQLJS_CDN}/${file}`,
   });
-  const res = await fetch('/tbc.sqlite');
-  if (!res.ok) throw new Error(`failed to fetch /tbc.sqlite: ${res.status}`);
+  const url = `/${expansion}.sqlite`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`failed to fetch ${url}: ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
   return new SQL.Database(buf);
 }

@@ -4,6 +4,7 @@ export type ClassName =
   | 'hunter'
   | 'rogue'
   | 'priest'
+  | 'deathknight'
   | 'shaman'
   | 'mage'
   | 'warlock'
@@ -18,34 +19,40 @@ export type Spec =
   | 'bm'
   | 'enh' | 'ele' | 'resto'
   | 'feral' | 'balance'
-  | 'ret';
+  | 'ret'
+  | 'blood' | 'unholy';
 
-export type LevelBucket = '1-19' | '20-39' | '40-59' | '60-70';
+export type LevelBucket = '1-19' | '20-39' | '40-59' | '60-70' | '70-80';
 
 export const CLASS_MASK: Record<ClassName, number> = {
-  warrior: 1 << 0,
-  paladin: 1 << 1,
-  hunter:  1 << 2,
-  rogue:   1 << 3,
-  priest:  1 << 4,
-  // 1<<5 = death knight, post-TBC
-  shaman:  1 << 6,
-  mage:    1 << 7,
-  warlock: 1 << 8,
+  warrior:     1 << 0,
+  paladin:     1 << 1,
+  hunter:      1 << 2,
+  rogue:       1 << 3,
+  priest:      1 << 4,
+  deathknight: 1 << 5,
+  shaman:      1 << 6,
+  mage:        1 << 7,
+  warlock:     1 << 8,
   // 1<<9 = monk, post-MoP
-  druid:   1 << 10,
+  druid:       1 << 10,
 };
 
 export const SPEC_BY_CLASS: Record<ClassName, readonly Spec[]> = {
-  warrior: ['arms', 'fury', 'prot'],
-  paladin: ['ret', 'prot', 'holy'],
-  hunter:  ['bm'],
-  rogue:   ['combat'],
-  priest:  ['shadow', 'disc'],
-  shaman:  ['enh', 'ele', 'resto'],
-  mage:    ['frost', 'fire'],
-  warlock: ['affliction', 'destro'],
-  druid:   ['feral', 'balance', 'resto'],
+  warrior:     ['arms', 'fury', 'prot'],
+  paladin:     ['ret', 'prot', 'holy'],
+  hunter:      ['bm'],
+  rogue:       ['combat'],
+  priest:      ['shadow', 'disc'],
+  deathknight: ['blood', 'frost', 'unholy'],
+  shaman:      ['enh', 'ele', 'resto'],
+  mage:        ['frost', 'fire'],
+  warlock:     ['affliction', 'destro'],
+  druid:       ['feral', 'balance', 'resto'],
+};
+
+export const CLASS_MIN_LEVEL: Partial<Record<ClassName, number>> = {
+  deathknight: 55,
 };
 
 export const SLOT = {
@@ -90,15 +97,16 @@ export const WEAPON_SUBCLASS = {
 const W = WEAPON_SUBCLASS;
 
 export const ALLOWED_WEAPON_SUBCLASS: Record<ClassName, ReadonlySet<number>> = {
-  warrior: new Set([W.Axe1H, W.Axe2H, W.Bow, W.Gun, W.Mace1H, W.Mace2H, W.Polearm, W.Sword1H, W.Sword2H, W.Staff, W.Fist, W.Dagger, W.Thrown, W.Crossbow, W.Misc]),
-  paladin: new Set([W.Axe1H, W.Axe2H, W.Mace1H, W.Mace2H, W.Polearm, W.Sword1H, W.Sword2H, W.Misc]),
-  hunter:  new Set([W.Axe1H, W.Axe2H, W.Bow, W.Gun, W.Polearm, W.Sword1H, W.Sword2H, W.Staff, W.Fist, W.Dagger, W.Crossbow, W.Thrown, W.Misc]),
-  rogue:   new Set([W.Bow, W.Crossbow, W.Dagger, W.Fist, W.Gun, W.Mace1H, W.Sword1H, W.Thrown, W.Misc]),
-  priest:  new Set([W.Mace1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
-  shaman:  new Set([W.Axe1H, W.Axe2H, W.Mace1H, W.Mace2H, W.Staff, W.Fist, W.Dagger, W.Misc]),
-  mage:    new Set([W.Sword1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
-  warlock: new Set([W.Sword1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
-  druid:   new Set([W.Mace1H, W.Mace2H, W.Polearm, W.Staff, W.Fist, W.Dagger, W.Misc]),
+  warrior:     new Set([W.Axe1H, W.Axe2H, W.Bow, W.Gun, W.Mace1H, W.Mace2H, W.Polearm, W.Sword1H, W.Sword2H, W.Staff, W.Fist, W.Dagger, W.Thrown, W.Crossbow, W.Misc]),
+  paladin:     new Set([W.Axe1H, W.Axe2H, W.Mace1H, W.Mace2H, W.Polearm, W.Sword1H, W.Sword2H, W.Misc]),
+  hunter:      new Set([W.Axe1H, W.Axe2H, W.Bow, W.Gun, W.Polearm, W.Sword1H, W.Sword2H, W.Staff, W.Fist, W.Dagger, W.Crossbow, W.Thrown, W.Misc]),
+  rogue:       new Set([W.Bow, W.Crossbow, W.Dagger, W.Fist, W.Gun, W.Mace1H, W.Sword1H, W.Thrown, W.Misc]),
+  priest:      new Set([W.Mace1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
+  deathknight: new Set([W.Axe1H, W.Axe2H, W.Mace1H, W.Mace2H, W.Polearm, W.Sword1H, W.Sword2H, W.Misc]),
+  shaman:      new Set([W.Axe1H, W.Axe2H, W.Mace1H, W.Mace2H, W.Staff, W.Fist, W.Dagger, W.Misc]),
+  mage:        new Set([W.Sword1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
+  warlock:     new Set([W.Sword1H, W.Staff, W.Wand, W.Dagger, W.Misc]),
+  druid:       new Set([W.Mace1H, W.Mace2H, W.Polearm, W.Staff, W.Fist, W.Dagger, W.Misc]),
 };
 
 export const WEAPON_SLOTS: ReadonlySet<number> = new Set([
@@ -107,7 +115,7 @@ export const WEAPON_SLOTS: ReadonlySet<number> = new Set([
 
 export const ARMOR_SUBCLASS = {
   Misc: 0, Cloth: 1, Leather: 2, Mail: 3, Plate: 4,
-  Buckler: 5, Shield: 6, Libram: 7, Idol: 8, Totem: 9,
+  Buckler: 5, Shield: 6, Libram: 7, Idol: 8, Totem: 9, Sigil: 10,
 } as const;
 
 const A = ARMOR_SUBCLASS;
@@ -123,6 +131,8 @@ export function allowedArmorSubclass(cls: ClassName, level: number): ReadonlySet
       return level >= 40
         ? new Set([A.Misc, A.Cloth, A.Leather, A.Mail, A.Plate])
         : new Set([A.Misc, A.Cloth, A.Leather, A.Mail]);
+    case 'deathknight':
+      return new Set([A.Misc, A.Cloth, A.Leather, A.Mail, A.Plate]);
     case 'hunter':
     case 'shaman':
       return level >= 40
@@ -143,6 +153,7 @@ export const RELIC_BY_CLASS: Partial<Record<ClassName, number>> = {
   paladin: A.Libram,
   druid: A.Idol,
   shaman: A.Totem,
+  deathknight: A.Sigil,
 };
 
 export const DISPLAY_SLOTS = [
@@ -220,5 +231,6 @@ export function bucketForLevel(level: number): LevelBucket {
   if (level <= 19) return '1-19';
   if (level <= 39) return '20-39';
   if (level <= 59) return '40-59';
-  return '60-70';
+  if (level <= 70) return '60-70';
+  return '70-80';
 }

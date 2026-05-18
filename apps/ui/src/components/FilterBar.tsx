@@ -1,6 +1,6 @@
 import type { Spec } from '@wowgear/core';
 import { SPEC_BY_CLASS } from '@wowgear/core';
-import type { CharState } from '../urlState.js';
+import { LEVEL_CAP, type CharState } from '../urlState.js';
 
 interface Props {
   state: CharState;
@@ -32,7 +32,7 @@ export function FilterBar({ state, onChange }: Props): JSX.Element {
         <input
           type="range"
           min={1}
-          max={70}
+          max={LEVEL_CAP[state.expansion]}
           value={state.level}
           onChange={(e) => onChange({ level: Number(e.target.value) })}
           className="w-40 accent-yellow-400"

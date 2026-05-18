@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "build:db": "bun run src/cli/build.ts",
-    "build:tbc": "bun run src/cli/build.ts --dump /tmp/agents/burning-crusade-item-db/db/unmodified.sql --thatsmybis /tmp/agents/burning-crusade-item-db/thatsmybis --world /tmp/agents/tbc-db/Full_DB/TBCDB_1.10.0_ReturnOfTheVengeance.sql",
+    "build:vanilla": "bun run src/cli/build.ts --expansion=vanilla --world /tmp/agents/classic-db/Full_DB/ClassicDB_1_12_1_z2815.sql",
+    "build:tbc": "bun run src/cli/build.ts --expansion=tbc --dump /tmp/agents/burning-crusade-item-db/db/unmodified.sql --thatsmybis /tmp/agents/burning-crusade-item-db/thatsmybis --world /tmp/agents/tbc-db/Full_DB/TBCDB_1.10.0_ReturnOfTheVengeance.sql",
+    "build:wotlk": "bun run src/cli/build.ts --expansion=wotlk --world /tmp/agents/wotlk-db/Full_DB/WoTLKDB_1_9_14092.sql",
+    "build:all": "pnpm build:vanilla && pnpm build:tbc && pnpm build:wotlk",
     "fixture": "bun run src/cli/fixture.ts",
     "test": "bun test"
   },

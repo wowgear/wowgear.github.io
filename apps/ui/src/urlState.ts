@@ -1,8 +1,27 @@
 import { useEffect, useState } from 'react';
 import type { ClassName, Spec } from '@wowgear/core';
-import { SPEC_BY_CLASS } from '@wowgear/core';
+import { CLASS_MIN_LEVEL, SPEC_BY_CLASS } from '@wowgear/core';
+
+export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
+
+export const LEVEL_CAP: Record<Expansion, number> = { vanilla: 60, tbc: 70, wotlk: 80 };
+
+const EXPANSIONS: ReadonlySet<Expansion> = new Set(['vanilla', 'tbc', 'wotlk']);
+
+const EXPANSION_ORDER: Expansion[] = ['vanilla', 'tbc', 'wotlk'];
+
+const CLASS_EXPANSION_MIN: Partial<Record<ClassName, Expansion>> = {
+  deathknight: 'wotlk',
+};
+
+function isClassAvailable(cls: ClassName, exp: Expansion): boolean {
+  const min = CLASS_EXPANSION_MIN[cls];
+  if (!min) return true;
+  return EXPANSION_ORDER.indexOf(exp) >= EXPANSION_ORDER.indexOf(min);
+}
 
 export interface CharState {
+  expansion: Expansion;
   cls: ClassName;
   spec: Spec;
   level: number;
@@ -11,18 +30,29 @@ export interface CharState {
   holiday: boolean;
 }
 
-const DEFAULT: CharState = { cls: 'rogue', spec: 'combat', level: 22, raid: false, pvp: false, holiday: false };
+const DEFAULT: CharState = {
+  expansion: 'vanilla',
+  cls: 'rogue', spec: 'combat', level: 22,
+  raid: false, pvp: false, holiday: false,
+};
 
 function parse(search: string): CharState {
   const p = new URLSearchParams(search);
-  const cls = (p.get('class') ?? DEFAULT.cls) as ClassName;
+  const wantedExp = p.get('expansion') as Expansion | null;
+  const expansion: Expansion = wantedExp && EXPANSIONS.has(wantedExp) ? wantedExp : DEFAULT.expansion;
+  const cap = LEVEL_CAP[expansion];
+  let cls = (p.get('class') ?? DEFAULT.cls) as ClassName;
+  if (!isClassAvailable(cls, expansion)) cls = DEFAULT.cls;
   const specs = SPEC_BY_CLASS[cls] ?? [DEFAULT.spec];
   const wanted = p.get('spec') as Spec | null;
   const spec: Spec = wanted && specs.includes(wanted) ? wanted : specs[0]!;
   const lvl = Number(p.get('level') ?? DEFAULT.level);
-  const level = Number.isFinite(lvl) ? Math.min(70, Math.max(1, Math.round(lvl))) : DEFAULT.level;
+  const classMin = CLASS_MIN_LEVEL[cls] ?? 1;
+  const level = Number.isFinite(lvl)
+    ? Math.min(cap, Math.max(classMin, Math.round(lvl)))
+    : Math.min(cap, Math.max(classMin, DEFAULT.level));
   return {
-    cls, spec, level,
+    expansion, cls, spec, level,
     raid: p.get('raid') === '1',
     pvp: p.get('pvp') === '1',
     holiday: p.get('holiday') === '1',
@@ -30,7 +60,9 @@ function parse(search: string): CharState {
 }
 
 function serialize(s: CharState): string {
-  const parts = [`class=${s.cls}`, `spec=${s.spec}`, `level=${s.level}`];
+  const parts: string[] = [];
+  if (s.expansion !== DEFAULT.expansion) parts.push(`expansion=${s.expansion}`);
+  parts.push(`class=${s.cls}`, `spec=${s.spec}`, `level=${s.level}`);
   if (s.raid) parts.push('raid=1');
   if (s.pvp) parts.push('pvp=1');
   if (s.holiday) parts.push('holiday=1');
@@ -49,11 +81,16 @@ export function useUrlState(): [CharState, (next: Partial<CharState>) => void] {
   const update = (next: Partial<CharState>): void => {
     setState((prev) => {
       const candidate = { ...prev, ...next };
-      const specs = SPEC_BY_CLASS[candidate.cls];
+      const exp = candidate.expansion;
+      const cap = LEVEL_CAP[exp];
+      const cls = isClassAvailable(candidate.cls, exp) ? candidate.cls : DEFAULT.cls;
+      const classMin = CLASS_MIN_LEVEL[cls] ?? 1;
+      const safeSpecs = SPEC_BY_CLASS[cls];
       const merged: CharState = {
-        cls: candidate.cls,
-        spec: specs.includes(candidate.spec) ? candidate.spec : specs[0]!,
-        level: Math.min(70, Math.max(1, Math.round(candidate.level))),
+        expansion: exp,
+        cls,
+        spec: safeSpecs.includes(candidate.spec) ? candidate.spec : safeSpecs[0]!,
+        level: Math.min(cap, Math.max(classMin, Math.round(candidate.level))),
         raid: candidate.raid,
         pvp: candidate.pvp,
         holiday: candidate.holiday,

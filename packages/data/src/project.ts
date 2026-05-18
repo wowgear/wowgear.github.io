@@ -150,11 +150,14 @@ export function projectItems(items: ParsedTable, expansionMinPatch = 2): Project
   return out;
 }
 
+const TEST_NAME_RE = /\b(TEST|Test|test|QA|UNUSED|DEPRECATED|JEFF|ALEX|Indalamar)\b|\bScott K\b|\(Test\)/;
+
 export function shouldKeepItem(it: ProjectedItem): boolean {
   if (it.name === '') return false;
   if ((it.flags & ITEM_FLAG_CONJURED) !== 0) return false;
   if ((it.flags & ITEM_FLAG_DEPRECATED) !== 0) return false;
   if (it.duration > 0) return false;
+  if (TEST_NAME_RE.test(it.name)) return false;
   if (it.quality >= 2) return true;
   if (it.slot === 0) return false;
   try {

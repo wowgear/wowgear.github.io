@@ -59,10 +59,13 @@ export function App(): JSX.Element {
   const [picked, setPicked] = useState<RankedItem | null>(null);
 
   useEffect(() => {
-    loadDb()
+    setBundle(null);
+    setError(null);
+    setPicked(null);
+    loadDb(state.expansion)
       .then((db) => setBundle(loadAll(db)))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-  }, []);
+  }, [state.expansion]);
 
   const filteredSources = useMemo(() => {
     if (!bundle) return null;
@@ -95,10 +98,17 @@ export function App(): JSX.Element {
 
   return (
     <div className="h-screen flex flex-col">
-      <Navbar />
+      <Navbar
+        expansion={state.expansion}
+        onChange={(exp) => update({ expansion: exp })}
+      />
 
       <div className="flex-1 flex overflow-hidden w-full max-w-6xl mx-auto">
-        <ClassPicker selected={state.cls} onSelect={(cls) => update({ cls })} />
+        <ClassPicker
+          selected={state.cls}
+          expansion={state.expansion}
+          onSelect={(cls) => update({ cls })}
+        />
 
         <main className="flex-1 flex flex-col overflow-hidden">
           <FilterBar state={state} onChange={update} />
