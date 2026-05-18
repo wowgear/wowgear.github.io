@@ -1,0 +1,22 @@
+{
+  "name": "@wowgear/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./weights": "./src/weights.ts",
+    "./score": "./src/score.ts",
+    "./select": "./src/select.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "score": "bun run src/cli/score.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.3"
+  }
+}

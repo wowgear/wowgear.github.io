@@ -1,0 +1,19 @@
+{
+  "name": "@wowgear/data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:db": "bun run src/cli/build.ts",
+    "build:tbc": "bun run src/cli/build.ts --dump /tmp/agents/burning-crusade-item-db/db/unmodified.sql --thatsmybis /tmp/agents/burning-crusade-item-db/thatsmybis --world /tmp/agents/tbc-db/Full_DB/TBCDB_1.10.0_ReturnOfTheVengeance.sql",
+    "fixture": "bun run src/cli/fixture.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@wowgear/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.3"
+  }
+}
