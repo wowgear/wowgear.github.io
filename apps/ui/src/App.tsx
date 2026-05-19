@@ -128,6 +128,7 @@ export function App(): JSX.Element {
                         label={SLOT_LABELS[slot] ?? String(slot)}
                         list={results[slot] ?? []}
                         picked={picked}
+                        expansion={state.expansion}
                         onPick={setPicked}
                       />
                     </div>
@@ -138,7 +139,7 @@ export function App(): JSX.Element {
           </div>
         </main>
 
-        <ItemDetailsPanel picked={picked} />
+        <ItemDetailsPanel picked={picked} expansion={state.expansion} />
       </div>
     </div>
   );

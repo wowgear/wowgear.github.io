@@ -1,9 +1,11 @@
 import type { ItemSource, RankedItem } from '@wowgear/core';
 import { ItemTooltip } from './ItemTooltip.js';
 import { sourceUrl } from '../wowhead.js';
+import type { Expansion } from '../urlState.js';
 
 interface Props {
   picked: RankedItem | null;
+  expansion: Expansion;
 }
 
 function formatCopper(copper: number): string {
@@ -36,7 +38,7 @@ function dedupeSources(sources: ItemSource[]): ItemSource[] {
   });
 }
 
-export function ItemDetailsPanel({ picked }: Props): JSX.Element {
+export function ItemDetailsPanel({ picked, expansion }: Props): JSX.Element {
   return (
     <aside className="w-[360px] shrink-0 bg-panel2 border-l border-black/40 flex flex-col">
       <div className="px-4 py-3 text-[10px] uppercase tracking-wide text-muted border-b border-black/40 shrink-0">
@@ -48,48 +50,55 @@ export function ItemDetailsPanel({ picked }: Props): JSX.Element {
           <p className="text-muted text-sm">Select an item to see details and sources</p>
         </div>
       ) : (
-        <Body picked={picked} />
+        <Body picked={picked} expansion={expansion} />
       )}
     </aside>
   );
 }
 
-function Body({ picked }: { picked: RankedItem }): JSX.Element {
+function Body({ picked, expansion }: { picked: RankedItem; expansion: Expansion }): JSX.Element {
   const sources = dedupeSources(picked.sources);
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 shrink-0">
-        <ItemTooltip item={picked.item} />
+        <ItemTooltip item={picked.item} expansion={expansion} />
       </div>
       <div className="px-4 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted shrink-0">
         Sources
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-2">
         {sources.length === 0 && <div className="text-muted text-sm px-1">no known sources</div>}
-        {sources.map((s, i) => (
-          <div key={i} className="bg-panel rounded p-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="capitalize text-yellow-300/90">{s.source_type}</span>
-              {s.source_min_level != null && (
-                <span className="text-muted text-xs">lvl {s.source_min_level}+</span>
+        {sources.map((s, i) => {
+          const url = sourceUrl(expansion, s);
+          return (
+            <div key={i} className="bg-panel rounded p-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="capitalize text-yellow-300/90">{s.source_type}</span>
+                {s.source_min_level != null && (
+                  <span className="text-muted text-xs">lvl {s.source_min_level}+</span>
+                )}
+              </div>
+              {url ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-ink hover:underline hover:text-yellow-200"
+                >
+                  {s.source_name}
+                </a>
+              ) : (
+                <span className="text-muted italic">{s.source_name}</span>
               )}
+              {s.source_zone && <div className="text-muted text-xs">{s.source_zone}</div>}
+              <div className="flex gap-3 text-xs text-muted mt-1">
+                {s.drop_chance != null && <span>{(s.drop_chance * 100).toFixed(1)}% drop</span>}
+                {s.vendor_cost_copper != null && <span>{formatCopper(s.vendor_cost_copper)}</span>}
+                {s.quest_choice_group != null && <span>choice #{s.quest_choice_group}</span>}
+              </div>
             </div>
-            <a
-              href={sourceUrl(s)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ink hover:underline hover:text-yellow-200"
-            >
-              {s.source_name}
-            </a>
-            {s.source_zone && <div className="text-muted text-xs">{s.source_zone}</div>}
-            <div className="flex gap-3 text-xs text-muted mt-1">
-              {s.drop_chance != null && <span>{(s.drop_chance * 100).toFixed(1)}% drop</span>}
-              {s.vendor_cost_copper != null && <span>{formatCopper(s.vendor_cost_copper)}</span>}
-              {s.quest_choice_group != null && <span>choice #{s.quest_choice_group}</span>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

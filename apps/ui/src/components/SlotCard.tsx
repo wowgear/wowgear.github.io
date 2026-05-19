@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RankedItem } from '@wowgear/core';
 import { ItemTooltip } from './ItemTooltip.js';
+import type { Expansion } from '../urlState.js';
 
 const QUALITY_CLASS: Record<number, string> = {
   0: 'text-quality-0', 1: 'text-quality-1', 2: 'text-quality-2',
@@ -11,10 +12,11 @@ interface Props {
   label: string;
   list: RankedItem[];
   picked: RankedItem | null;
+  expansion: Expansion;
   onPick: (item: RankedItem) => void;
 }
 
-export function SlotCard({ label, list, picked, onPick }: Props): JSX.Element {
+export function SlotCard({ label, list, picked, expansion, onPick }: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [hover, setHover] = useState(false);
@@ -83,7 +85,7 @@ export function SlotCard({ label, list, picked, onPick }: Props): JSX.Element {
 
       {hover && !open && (
         <div className="absolute left-0 top-full z-30 mt-1 pointer-events-none">
-          <ItemTooltip item={selected.item} />
+          <ItemTooltip item={selected.item} expansion={expansion} />
         </div>
       )}
 

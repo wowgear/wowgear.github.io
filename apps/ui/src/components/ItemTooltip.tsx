@@ -1,5 +1,6 @@
 import type { Item } from '@wowgear/core';
 import { itemUrl } from '../wowhead.js';
+import type { Expansion } from '../urlState.js';
 
 const QUALITY_HEX: Record<number, string> = {
   0: '#9d9d9d', 1: '#ffffff', 2: '#1eff00', 3: '#0070dd', 4: '#a335ee', 5: '#ff8000',
@@ -26,12 +27,12 @@ function statLabel(key: string): string {
   return STAT_LABELS[key] ?? key;
 }
 
-export function ItemTooltip({ item }: { item: Item }): JSX.Element {
+export function ItemTooltip({ item, expansion }: { item: Item; expansion: Expansion }): JSX.Element {
   const color = QUALITY_HEX[item.quality] ?? '#ffffff';
   return (
     <div className="bg-black/95 border border-white/20 rounded p-3 text-sm min-w-[240px] shadow-xl">
       <a
-        href={itemUrl(item.id)}
+        href={itemUrl(expansion, item.id)}
         target="_blank"
         rel="noopener noreferrer"
         style={{ color }}
