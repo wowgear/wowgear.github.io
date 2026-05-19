@@ -127,6 +127,7 @@ export function App(): JSX.Element {
                       <SlotCard
                         label={SLOT_LABELS[slot] ?? String(slot)}
                         list={results[slot] ?? []}
+                        picked={picked}
                         onPick={setPicked}
                       />
                     </div>
