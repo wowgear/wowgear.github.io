@@ -5,6 +5,7 @@ import { loadDumpDir, parseDumpSql, rowToObject } from '../dump.js';
 import { projectItems, shouldKeepItem, type ProjectedSource } from '../project.js';
 import { createSchema } from '../schema.js';
 import { readWorldSources } from '../worldsource.js';
+import { readWagoCraftSources } from '../wagosource.js';
 
 export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
 
@@ -15,6 +16,7 @@ interface Args {
   dump: string | null;
   thatsmybis: string | null;
   world: string | null;
+  wago: string | null;
   out: string;
 }
 
@@ -38,11 +40,12 @@ function parseArgs(argv: string[]): Args {
   const dump = args.get('dump') ?? null;
   const thatsmybis = args.get('thatsmybis') ?? null;
   const world = args.get('world') ?? null;
+  const wago = args.get('wago') ?? null;
   if (!dump && !world) {
-    console.error('Usage: bun run build.ts --expansion=<vanilla|tbc|wotlk> [--dump <items.sql>] [--world <cmangos-world.sql>] [--thatsmybis <dir>] [--out path]');
+    console.error('Usage: bun run build.ts --expansion=<vanilla|tbc|wotlk> [--dump <items.sql>] [--world <cmangos-world.sql>] [--thatsmybis <dir>] [--wago <wago-dbc-dir>] [--out path]');
     process.exit(1);
   }
-  return { expansion, dump, thatsmybis, world, out };
+  return { expansion, dump, thatsmybis, world, wago, out };
 }
 
 interface ItemMeta {
@@ -185,8 +188,9 @@ function readThatsmybisSources(dir: string, knownItems: Set<number>): ProjectedS
   return out;
 }
 
+
 function main(): void {
-  const { expansion, dump, thatsmybis, world, out } = parseArgs(process.argv.slice(2));
+  const { expansion, dump, thatsmybis, world, wago, out } = parseArgs(process.argv.slice(2));
   console.log(`[ingest] expansion=${expansion} levelCap=${LEVEL_CAP[expansion]}`);
 
   const itemSrc = dump ?? world!;
@@ -222,6 +226,18 @@ function main(): void {
       realSourceItems = ws.itemsCovered;
     }
   }
+
+  if (wago) {
+    const path = resolve(wago);
+    if (!existsSync(path)) {
+      console.warn(`[ingest] wago dir not found: ${path}`);
+    } else {
+      const wagoSources = readWagoCraftSources(path, knownItems);
+      sources.push(...wagoSources);
+      for (const s of wagoSources) realSourceItems.add(s.item_id);
+    }
+  }
+
 
   let synthetic = 0;
   for (const [id, meta] of itemMeta) {

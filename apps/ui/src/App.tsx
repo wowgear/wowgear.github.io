@@ -72,6 +72,11 @@ export function App(): JSX.Element {
     const out = new Map<number, ItemSource[]>();
     for (const [id, list] of bundle.sources) {
       const kept = list.filter((s) => {
+        if (s.source_type === 'drop' && !state.drop) return false;
+        if (s.source_type === 'dungeon' && !state.dungeon) return false;
+        if (s.source_type === 'quest' && !state.quest) return false;
+        if (s.source_type === 'vendor' && !state.vendor) return false;
+        if (s.source_type === 'profession' && !state.profession) return false;
         if (s.source_type === 'raid' && !state.raid) return false;
         if (s.source_type === 'pvp' && !state.pvp) return false;
         if (s.source_type === 'holiday' && !state.holiday) return false;
@@ -80,7 +85,7 @@ export function App(): JSX.Element {
       if (kept.length > 0) out.set(id, kept);
     }
     return out;
-  }, [bundle, state.raid, state.pvp, state.holiday]);
+  }, [bundle, state.drop, state.dungeon, state.quest, state.vendor, state.profession, state.raid, state.pvp, state.holiday]);
 
   const results = useMemo(() => {
     if (!bundle || !filteredSources) return null;

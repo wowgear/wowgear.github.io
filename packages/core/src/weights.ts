@@ -2,6 +2,35 @@ import type { ClassName, LevelBucket, Spec, StatWeights } from './types.js';
 
 type SpecWeights = Record<LevelBucket, StatWeights>;
 
+const ROGUE_SUBTLETY: SpecWeights = {
+  '1-19': {
+    agi: 1.3, str: 0.5, sta: 0.1, ap: 1.0, crit_rating: 1.1,
+    weapon_dps: 5.0,
+  },
+  '20-39': {
+    agi: 1.4, str: 0.4, sta: 0.1, ap: 1.0,
+    crit_rating: 1.2, hit_rating: 1.1,
+    weapon_dps: 6.5,
+  },
+  '40-59': {
+    agi: 1.5, str: 0.3, sta: 0.1, ap: 1.0,
+    crit_rating: 1.3, hit_rating: 1.3, haste_rating: 0.7,
+    weapon_dps: 8.0,
+  },
+  '60-70': {
+    agi: 1.6, str: 0.2, sta: 0.05, ap: 1.0,
+    crit_rating: 1.4, hit_rating: 1.4, haste_rating: 0.8,
+    expertise_rating: 0.9, armor_pen: 1.0,
+    weapon_dps: 9.0,
+  },
+  '70-80': {
+    agi: 1.7, str: 0.2, sta: 0.05, ap: 1.1,
+    crit_rating: 1.5, hit_rating: 1.5, haste_rating: 0.9,
+    expertise_rating: 1.0, armor_pen: 1.4,
+    weapon_dps: 10.0,
+  },
+};
+
 const ROGUE_COMBAT: SpecWeights = {
   '1-19': {
     agi: 1.3, str: 0.7, sta: 0.1, ap: 1.0, crit_rating: 1.0,
@@ -205,7 +234,7 @@ const DK_BLOOD: SpecWeights = {
 };
 
 export const weights: Record<ClassName, Partial<Record<Spec, SpecWeights>>> = {
-  rogue:       { combat: ROGUE_COMBAT },
+  rogue:       { combat: ROGUE_COMBAT, subtlety: ROGUE_SUBTLETY },
   warrior:     { arms: WARRIOR_ARMS, fury: WARRIOR_FURY, prot: WARRIOR_PROT },
   hunter:      { bm: HUNTER_BM },
   mage:        { frost: MAGE_FROST, fire: MAGE_FIRE },

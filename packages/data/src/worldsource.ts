@@ -15,6 +15,11 @@ const TABLES = new Set([
   'game_event_creature',
   'game_event_creature_data',
   'game_event_quest',
+  'instance_template',
+  'skinning_loot_template',
+  'fishing_loot_template',
+  'prospecting_loot_template',
+  'disenchant_loot_template',
 ]);
 
 interface CreatureInfo {
@@ -203,6 +208,8 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
   const creatureLoot = tables.get('creature_loot_template');
   const npcVendor = tables.get('npc_vendor');
   const questTemplate = tables.get('quest_template');
+  const instanceTemplate = tables.get('instance_template');
+  const creatureSpawn = tables.get('creature');
 
   const creatures = creatureTemplate
     ? buildIndex<CreatureInfo>(creatureTemplate, 'Entry', (o) => ({
@@ -212,6 +219,24 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       }))
     : new Map();
   console.log(`[world] ${creatures.size} creatures`);
+
+  const instanceMaps = new Set<number>();
+  if (instanceTemplate) {
+    for (const row of instanceTemplate.rows) {
+      const o = rowToObject(instanceTemplate, row);
+      instanceMaps.add(num(o.map));
+    }
+  }
+  console.log(`[world] ${instanceMaps.size} instance maps`);
+
+  const dungeonCreatures = new Set<number>();
+  if (creatureSpawn && instanceMaps.size > 0) {
+    for (const row of creatureSpawn.rows) {
+      const o = rowToObject(creatureSpawn, row);
+      if (instanceMaps.has(num(o.map))) dungeonCreatures.add(num(o.id));
+    }
+  }
+  console.log(`[world] ${dungeonCreatures.size} dungeon creature entries`);
 
   const { holidayEntries, holidayQuests } = buildHolidaySets(tables);
 
@@ -226,9 +251,13 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       if (!c || !c.name) continue;
       const label = levelLabel(c.minLevel, c.maxLevel);
       const isHoliday = holidayEntries.has(r.entry);
+      const isDungeon = dungeonCreatures.has(r.entry);
+      const stype: ProjectedSource['source_type'] = isHoliday
+        ? 'holiday'
+        : isDungeon ? 'dungeon' : 'drop';
       out.push({
         item_id: r.item,
-        source_type: isHoliday ? 'holiday' : 'drop',
+        source_type: stype,
         source_name: label ? `${c.name} (${label})` : c.name,
         source_zone: null,
         source_min_level: appropriateLevel(c.minLevel, c.maxLevel),
@@ -332,6 +361,37 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       }
     }
     console.log(`[world] ${added} quest reward sources`);
+  }
+
+  const PROFESSION_TABLES: ReadonlyArray<[string, string]> = [
+    ['skinning_loot_template', 'Skinning'],
+    ['fishing_loot_template', 'Fishing'],
+    ['prospecting_loot_template', 'Prospecting'],
+    ['disenchant_loot_template', 'Disenchanting'],
+  ];
+  for (const [tableName, label] of PROFESSION_TABLES) {
+    const t = tables.get(tableName);
+    if (!t) continue;
+    let added = 0;
+    for (const row of t.rows) {
+      const o = rowToObject(t, row);
+      const item = num(o.item);
+      if (!knownItems.has(item)) continue;
+      const chance = num(o.ChanceOrQuestChance);
+      out.push({
+        item_id: item,
+        source_type: 'profession',
+        source_name: label,
+        source_zone: null,
+        source_min_level: 1,
+        drop_chance: chance > 0 && chance <= 100 ? chance / 100 : null,
+        vendor_cost_copper: null,
+        quest_choice_group: null,
+      });
+      itemsCovered.add(item);
+      added++;
+    }
+    console.log(`[world] ${added} ${label.toLowerCase()} sources`);
   }
 
   console.log(`[world] total ${out.length} sources covering ${itemsCovered.size} items`);

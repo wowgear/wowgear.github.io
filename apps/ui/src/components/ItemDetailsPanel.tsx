@@ -20,7 +20,7 @@ function formatCopper(copper: number): string {
 }
 
 const SOURCE_ORDER: Record<ItemSource['source_type'], number> = {
-  quest: 0, vendor: 1, drop: 2, raid: 3, craft: 4, pvp: 5, holiday: 6,
+  quest: 0, vendor: 1, drop: 2, dungeon: 3, profession: 4, craft: 5, raid: 6, pvp: 7, holiday: 8,
 };
 
 function dedupeSources(sources: ItemSource[]): ItemSource[] {

@@ -25,6 +25,11 @@ export interface CharState {
   cls: ClassName;
   spec: Spec;
   level: number;
+  drop: boolean;
+  dungeon: boolean;
+  quest: boolean;
+  vendor: boolean;
+  profession: boolean;
   raid: boolean;
   pvp: boolean;
   holiday: boolean;
@@ -33,6 +38,7 @@ export interface CharState {
 const DEFAULT: CharState = {
   expansion: 'vanilla',
   cls: 'rogue', spec: 'combat', level: 22,
+  drop: true, dungeon: true, quest: true, vendor: true, profession: true,
   raid: false, pvp: false, holiday: false,
 };
 
@@ -53,6 +59,11 @@ function parse(search: string): CharState {
     : Math.min(cap, Math.max(classMin, DEFAULT.level));
   return {
     expansion, cls, spec, level,
+    drop: p.get('drop') !== '0',
+    dungeon: p.get('dungeon') !== '0',
+    quest: p.get('quest') !== '0',
+    vendor: p.get('vendor') !== '0',
+    profession: p.get('profession') !== '0',
     raid: p.get('raid') === '1',
     pvp: p.get('pvp') === '1',
     holiday: p.get('holiday') === '1',
@@ -63,6 +74,11 @@ function serialize(s: CharState): string {
   const parts: string[] = [];
   if (s.expansion !== DEFAULT.expansion) parts.push(`expansion=${s.expansion}`);
   parts.push(`class=${s.cls}`, `spec=${s.spec}`, `level=${s.level}`);
+  if (!s.drop) parts.push('drop=0');
+  if (!s.dungeon) parts.push('dungeon=0');
+  if (!s.quest) parts.push('quest=0');
+  if (!s.vendor) parts.push('vendor=0');
+  if (!s.profession) parts.push('profession=0');
   if (s.raid) parts.push('raid=1');
   if (s.pvp) parts.push('pvp=1');
   if (s.holiday) parts.push('holiday=1');
@@ -91,6 +107,11 @@ export function useUrlState(): [CharState, (next: Partial<CharState>) => void] {
         cls,
         spec: safeSpecs.includes(candidate.spec) ? candidate.spec : safeSpecs[0]!,
         level: Math.min(cap, Math.max(classMin, Math.round(candidate.level))),
+        drop: candidate.drop,
+        dungeon: candidate.dungeon,
+        quest: candidate.quest,
+        vendor: candidate.vendor,
+        profession: candidate.profession,
         raid: candidate.raid,
         pvp: candidate.pvp,
         holiday: candidate.holiday,

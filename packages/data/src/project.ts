@@ -24,7 +24,7 @@ const ITEM_FLAG_DEPRECATED = 0x10;
 
 export interface ProjectedSource {
   item_id: number;
-  source_type: 'drop' | 'quest' | 'vendor' | 'craft' | 'pvp' | 'raid' | 'holiday';
+  source_type: 'drop' | 'dungeon' | 'quest' | 'vendor' | 'profession' | 'craft' | 'pvp' | 'raid' | 'holiday';
   source_name: string;
   source_zone: string | null;
   source_min_level: number | null;

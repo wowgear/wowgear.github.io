@@ -12,7 +12,7 @@ export type ClassName =
 
 export type Spec =
   | 'arms' | 'fury' | 'prot'
-  | 'combat'
+  | 'combat' | 'subtlety'
   | 'frost' | 'fire'
   | 'affliction' | 'destro'
   | 'shadow' | 'disc' | 'holy'
@@ -42,7 +42,7 @@ export const SPEC_BY_CLASS: Record<ClassName, readonly Spec[]> = {
   warrior:     ['arms', 'fury', 'prot'],
   paladin:     ['ret', 'prot', 'holy'],
   hunter:      ['bm'],
-  rogue:       ['combat'],
+  rogue:       ['combat', 'subtlety'],
   priest:      ['shadow', 'disc'],
   deathknight: ['blood', 'frost', 'unholy'],
   shaman:      ['enh', 'ele', 'resto'],
@@ -212,7 +212,7 @@ export interface Item {
 
 export interface ItemSource {
   item_id: number;
-  source_type: 'drop' | 'quest' | 'vendor' | 'craft' | 'pvp' | 'raid' | 'holiday';
+  source_type: 'drop' | 'dungeon' | 'quest' | 'vendor' | 'profession' | 'craft' | 'pvp' | 'raid' | 'holiday';
   source_name: string;
   source_zone: string | null;
   source_min_level: number | null;

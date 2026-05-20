@@ -12,21 +12,19 @@ export function FilterBar({ state, onChange }: Props): JSX.Element {
 
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 bg-panel2 border-b border-black/40">
-      <Group label="Spec">
-        <div className="flex gap-1">
-          {specs.map((s) => (
-            <button
-              key={s}
-              onClick={() => onChange({ spec: s as Spec })}
-              className={`px-3 py-1.5 text-sm rounded transition ${
-                state.spec === s ? 'bg-black/40 ring-1 ring-white/30 text-ink' : 'text-muted hover:text-ink hover:bg-black/20'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </Group>
+      <div className="flex items-center gap-1">
+        {specs.map((s) => (
+          <button
+            key={s}
+            onClick={() => onChange({ spec: s as Spec })}
+            className={`px-3 py-1.5 text-sm rounded transition ${
+              state.spec === s ? 'bg-black/40 ring-1 ring-white/30 text-ink' : 'text-muted hover:text-ink hover:bg-black/20'
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
 
       <Group label="Level">
         <input
@@ -40,11 +38,16 @@ export function FilterBar({ state, onChange }: Props): JSX.Element {
         <span className="font-mono text-sm w-8 text-right">{state.level}</span>
       </Group>
 
-      <Group label="Include">
+      <div className="flex items-center gap-1">
+        <Toggle on={state.drop} onClick={() => onChange({ drop: !state.drop })}>drop</Toggle>
+        <Toggle on={state.dungeon} onClick={() => onChange({ dungeon: !state.dungeon })}>dungeon</Toggle>
+        <Toggle on={state.quest} onClick={() => onChange({ quest: !state.quest })}>quest</Toggle>
+        <Toggle on={state.vendor} onClick={() => onChange({ vendor: !state.vendor })}>vendor</Toggle>
+        <Toggle on={state.profession} onClick={() => onChange({ profession: !state.profession })}>profession</Toggle>
         <Toggle on={state.raid} onClick={() => onChange({ raid: !state.raid })}>raid</Toggle>
         <Toggle on={state.pvp} onClick={() => onChange({ pvp: !state.pvp })}>pvp</Toggle>
         <Toggle on={state.holiday} onClick={() => onChange({ holiday: !state.holiday })}>holiday</Toggle>
-      </Group>
+      </div>
     </div>
   );
 }
