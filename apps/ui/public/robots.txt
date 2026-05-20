@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://wowgear.github.io/sitemap.xml
