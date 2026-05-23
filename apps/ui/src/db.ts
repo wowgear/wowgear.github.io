@@ -67,6 +67,7 @@ export function loadAll(db: Database): DbBundle {
         slot: obj.slot as Item['slot'],
         subclass: obj.subclass as number,
         class_mask: obj.class_mask as number,
+        race_mask: (obj.race_mask as number | null) ?? 0,
         stats: JSON.parse(obj.stats_json as string),
         weapon_min_dmg: obj.weapon_min_dmg as number | null,
         weapon_max_dmg: obj.weapon_max_dmg as number | null,
@@ -92,6 +93,7 @@ export function loadAll(db: Database): DbBundle {
         drop_chance: obj.drop_chance as number | null,
         vendor_cost_copper: obj.vendor_cost_copper as number | null,
         quest_choice_group: obj.quest_choice_group as number | null,
+        race_mask: (obj.race_mask as number | null) ?? 0,
       };
       const list = sources.get(s.item_id);
       if (list) list.push(s);

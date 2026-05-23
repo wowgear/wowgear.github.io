@@ -55,6 +55,43 @@ export const CLASS_MIN_LEVEL: Partial<Record<ClassName, number>> = {
   deathknight: 55,
 };
 
+export type Faction = 'any' | 'alliance' | 'horde';
+
+export const RACE_BIT = {
+  Human:    1 << 0,
+  Orc:      1 << 1,
+  Dwarf:    1 << 2,
+  NightElf: 1 << 3,
+  Undead:   1 << 4,
+  Tauren:   1 << 5,
+  Gnome:    1 << 6,
+  Troll:    1 << 7,
+  Goblin:   1 << 8,
+  BloodElf: 1 << 9,
+  Draenei:  1 << 10,
+  Worgen:   1 << 11,
+} as const;
+
+export const ALLIANCE_RACE_MASK =
+  RACE_BIT.Human | RACE_BIT.Dwarf | RACE_BIT.NightElf | RACE_BIT.Gnome |
+  RACE_BIT.Draenei | RACE_BIT.Worgen;
+
+export const HORDE_RACE_MASK =
+  RACE_BIT.Orc | RACE_BIT.Undead | RACE_BIT.Tauren | RACE_BIT.Troll |
+  RACE_BIT.BloodElf | RACE_BIT.Goblin;
+
+export function factionRaceMask(f: Faction): number {
+  if (f === 'alliance') return ALLIANCE_RACE_MASK;
+  if (f === 'horde') return HORDE_RACE_MASK;
+  return ALLIANCE_RACE_MASK | HORDE_RACE_MASK;
+}
+
+export function raceMaskAllows(raceMask: number, faction: Faction): boolean {
+  if (raceMask === 0) return true;
+  if (faction === 'any') return true;
+  return (raceMask & factionRaceMask(faction)) !== 0;
+}
+
 export const SLOT = {
   Head: 1,
   Neck: 2,
@@ -203,6 +240,7 @@ export interface Item {
   slot: Slot;
   subclass: number;
   class_mask: number;
+  race_mask: number;
   stats: Stats;
   weapon_min_dmg: number | null;
   weapon_max_dmg: number | null;
@@ -219,6 +257,7 @@ export interface ItemSource {
   drop_chance: number | null;
   vendor_cost_copper: number | null;
   quest_choice_group: number | null;
+  race_mask: number;
 }
 
 export interface RankedItem {

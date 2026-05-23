@@ -98,6 +98,7 @@ export function App(): JSX.Element {
       weights,
       charLevel: state.level,
       charClass: state.cls,
+      faction: state.faction,
     });
   }, [bundle, filteredSources, state]);
 

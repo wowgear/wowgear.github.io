@@ -9,9 +9,9 @@ const ALL_CLASSES = Object.values(CLASS_MASK).reduce((a, b) => a | b, 0);
 const PHYS_DPS = CLASS_MASK.warrior | CLASS_MASK.paladin | CLASS_MASK.hunter | CLASS_MASK.rogue | CLASS_MASK.shaman | CLASS_MASK.druid;
 const LEATHER = CLASS_MASK.rogue | CLASS_MASK.druid;
 
-interface FixtureItem extends Omit<ProjectedItem, 'stats_json' | 'flags' | 'duration'> {
+interface FixtureItem extends Omit<ProjectedItem, 'stats_json' | 'flags' | 'duration' | 'race_mask' | 'required_honor_rank'> {
   stats: Record<string, number>;
-  sources: Omit<ProjectedSource, 'item_id'>[];
+  sources: Omit<ProjectedSource, 'item_id' | 'race_mask'>[];
 }
 
 const items: FixtureItem[] = [
@@ -122,24 +122,24 @@ function main(): void {
   createSchema(db);
 
   const insItem = db.prepare(`
-    INSERT INTO items (id, name, quality, item_level, required_level, slot, subclass, class_mask, stats_json, weapon_min_dmg, weapon_max_dmg, weapon_speed, expansion)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO items (id, name, quality, item_level, required_level, slot, subclass, class_mask, race_mask, stats_json, weapon_min_dmg, weapon_max_dmg, weapon_speed, expansion)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insSrc = db.prepare(`
-    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group, race_mask)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const tx = db.transaction(() => {
     for (const it of items) {
       insItem.run(
-        it.id, it.name, it.quality, it.item_level, it.required_level, it.slot, it.subclass, it.class_mask,
+        it.id, it.name, it.quality, it.item_level, it.required_level, it.slot, it.subclass, it.class_mask, 0,
         JSON.stringify(it.stats), it.weapon_min_dmg, it.weapon_max_dmg, it.weapon_speed, it.expansion,
       );
       for (const s of it.sources) {
         insSrc.run(
           it.id, s.source_type, s.source_name, s.source_zone, s.source_min_level,
-          s.drop_chance, s.vendor_cost_copper, s.quest_choice_group,
+          s.drop_chance, s.vendor_cost_copper, s.quest_choice_group, 0,
         );
       }
     }

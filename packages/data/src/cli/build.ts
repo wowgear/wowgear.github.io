@@ -6,6 +6,7 @@ import { projectItems, shouldKeepItem, type ProjectedSource } from '../project.j
 import { createSchema } from '../schema.js';
 import { readWorldSources } from '../worldsource.js';
 import { readWagoCraftSources } from '../wagosource.js';
+import { readWagoItems } from '../wagoitems.js';
 
 export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
 
@@ -53,6 +54,7 @@ interface ItemMeta {
   required_level: number;
   item_level: number;
   quality: number;
+  required_honor_rank: number;
 }
 
 function isVanillaRaidLoot(id: number, itemLevel: number, quality: number): boolean {
@@ -66,16 +68,6 @@ function isTbcRaidLoot(id: number, itemLevel: number, quality: number): boolean 
   return id >= 24000 && quality >= 4 && itemLevel >= 115;
 }
 
-const PVP_NAME_PATTERNS: RegExp[] = [
-  /^(Hateful|Merciless|Vengeful|Brutal|Gladiator's|Veteran's|Champion's) /,
-  /^(Savage|Deadly|Furious|Relentless|Wrathful) Gladiator's /,
-  /^(High Warlord's|Warlord's|General's|Lieutenant General's|Centurion's|Legionnaire's|Stone Guard's|Blood Guard's|Senior Sergeant's|First Sergeant's|Sergeant's|Sergeant Major's|Sergeant) /,
-  /^(Grand Marshal's|Field Marshal's|Marshal's|Knight-Captain's|Lieutenant Commander's|Knight-Lieutenant's|Knight's|Knight Champion's|Knight-Captain) /,
-];
-
-function isPvpLoot(name: string): boolean {
-  return PVP_NAME_PATTERNS.some((re) => re.test(name));
-}
 
 const SYNTHETIC_HOLIDAY_PATTERNS: RegExp[] = [
   /\bBrewfest\b/i,
@@ -99,7 +91,7 @@ function syntheticSources(items: Map<number, ItemMeta>): ProjectedSource[] {
     const base = meta.required_level > 0 ? meta.required_level : fromIlvl;
     const min = Math.min(70, Math.max(1, base));
 
-    const pvp = isPvpLoot(meta.name);
+    const pvp = meta.required_honor_rank > 0;
     const raid = !pvp && (isVanillaRaidLoot(id, meta.item_level, meta.quality) || isTbcRaidLoot(id, meta.item_level, meta.quality));
 
     const sourceType: ProjectedSource['source_type'] = pvp ? 'pvp' : raid ? 'raid' : 'drop';
@@ -118,6 +110,7 @@ function syntheticSources(items: Map<number, ItemMeta>): ProjectedSource[] {
       drop_chance: null,
       vendor_cost_copper: null,
       quest_choice_group: null,
+      race_mask: 0,
     });
   }
   return out;
@@ -183,6 +176,7 @@ function readThatsmybisSources(dir: string, knownItems: Set<number>): ProjectedS
       drop_chance: null,
       vendor_cost_copper: null,
       quest_choice_group: null,
+      race_mask: 0,
     });
   }
   return out;
@@ -193,24 +187,37 @@ function main(): void {
   const { expansion, dump, thatsmybis, world, wago, out } = parseArgs(process.argv.slice(2));
   console.log(`[ingest] expansion=${expansion} levelCap=${LEVEL_CAP[expansion]}`);
 
-  const itemSrc = dump ?? world!;
-  console.log(`[ingest] loading items from ${itemSrc}`);
-  const tables = loadDumpDir(itemSrc);
-  const itemTable = tables.get('items') ?? tables.get('item_template');
-  if (!itemTable) {
-    console.error(`[ingest] no 'items' or 'item_template' table found. Found: ${[...tables.keys()].join(', ')}`);
-    process.exit(2);
+  let all: ReturnType<typeof projectItems>;
+  const wagoItemSparse = wago ? resolve(wago, 'ItemSparse.csv') : null;
+  if (wagoItemSparse && existsSync(wagoItemSparse)) {
+    console.log(`[ingest] loading items from wago: ${wago}`);
+    all = readWagoItems(wago!).filter(shouldKeepItem);
+    console.log(`[ingest] parsed ${all.length} wago items (after prune)`);
+  } else {
+    const itemSrc = dump ?? world!;
+    console.log(`[ingest] loading items from ${itemSrc}`);
+    const tables = loadDumpDir(itemSrc);
+    const itemTable = tables.get('items') ?? tables.get('item_template');
+    if (!itemTable) {
+      console.error(`[ingest] no 'items' or 'item_template' table found. Found: ${[...tables.keys()].join(', ')}`);
+      process.exit(2);
+    }
+    console.log(`[ingest] parsed ${itemTable.rows.length} item rows from cmangos`);
+    all = projectItems(itemTable).filter(shouldKeepItem);
   }
-
-  console.log(`[ingest] parsed ${itemTable.rows.length} item rows`);
-  const all = projectItems(itemTable).filter(shouldKeepItem);
   const expansionCutoff: Record<Expansion, number> = { vanilla: 24000, tbc: 36000, wotlk: Infinity };
   const cutoff = expansionCutoff[expansion];
   const items = all.filter((it) => it.id < cutoff && it.required_level <= LEVEL_CAP[expansion]);
   console.log(`[ingest] keeping ${items.length} items after prune (cutoff id<${cutoff}, reqlvl<=${LEVEL_CAP[expansion]})`);
 
   const itemMeta = new Map<number, ItemMeta>();
-  for (const it of items) itemMeta.set(it.id, { name: it.name, required_level: it.required_level, item_level: it.item_level, quality: it.quality });
+  for (const it of items) itemMeta.set(it.id, {
+    name: it.name,
+    required_level: it.required_level,
+    item_level: it.item_level,
+    quality: it.quality,
+    required_honor_rank: it.required_honor_rank,
+  });
 
   const knownItems = new Set(itemMeta.keys());
   const sources: ProjectedSource[] = [];
@@ -221,7 +228,7 @@ function main(): void {
     if (!existsSync(path)) {
       console.warn(`[ingest] world DB not found: ${path}`);
     } else {
-      const ws = readWorldSources(path, knownItems);
+      const ws = readWorldSources(path, knownItems, wago);
       sources.push(...ws.sources);
       realSourceItems = ws.itemsCovered;
     }
@@ -266,7 +273,7 @@ function main(): void {
     if (s.source_type === 'raid' || s.source_type === 'pvp' || s.source_type === 'holiday') continue;
     const meta = itemMeta.get(s.item_id);
     if (!meta) continue;
-    if (isPvpLoot(meta.name)) {
+    if (meta.required_honor_rank > 0) {
       s.source_type = 'pvp';
       reclassifiedPvp++;
       continue;
@@ -289,14 +296,14 @@ function main(): void {
   createSchema(db);
 
   const insItem = db.prepare(`
-    INSERT INTO items (id, name, quality, item_level, required_level, slot, subclass, class_mask, stats_json, weapon_min_dmg, weapon_max_dmg, weapon_speed, expansion)
-    VALUES ($id, $name, $quality, $item_level, $required_level, $slot, $subclass, $class_mask, $stats_json, $weapon_min_dmg, $weapon_max_dmg, $weapon_speed, $expansion)
+    INSERT INTO items (id, name, quality, item_level, required_level, slot, subclass, class_mask, race_mask, stats_json, weapon_min_dmg, weapon_max_dmg, weapon_speed, expansion)
+    VALUES ($id, $name, $quality, $item_level, $required_level, $slot, $subclass, $class_mask, $race_mask, $stats_json, $weapon_min_dmg, $weapon_max_dmg, $weapon_speed, $expansion)
   `);
   const insertItems = db.transaction((rows: typeof items) => {
     for (const r of rows) insItem.run({
       $id: r.id, $name: r.name, $quality: r.quality, $item_level: r.item_level,
       $required_level: r.required_level, $slot: r.slot, $subclass: r.subclass,
-      $class_mask: r.class_mask, $stats_json: r.stats_json,
+      $class_mask: r.class_mask, $race_mask: r.race_mask, $stats_json: r.stats_json,
       $weapon_min_dmg: r.weapon_min_dmg, $weapon_max_dmg: r.weapon_max_dmg,
       $weapon_speed: r.weapon_speed, $expansion: r.expansion,
     });
@@ -304,15 +311,15 @@ function main(): void {
   insertItems(items);
 
   const insSrc = db.prepare(`
-    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group)
-    VALUES ($item_id, $source_type, $source_name, $source_zone, $source_min_level, $drop_chance, $vendor_cost_copper, $quest_choice_group)
+    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group, race_mask)
+    VALUES ($item_id, $source_type, $source_name, $source_zone, $source_min_level, $drop_chance, $vendor_cost_copper, $quest_choice_group, $race_mask)
   `);
   const insertSrc = db.transaction((rows: ProjectedSource[]) => {
     for (const r of rows) insSrc.run({
       $item_id: r.item_id, $source_type: r.source_type, $source_name: r.source_name,
       $source_zone: r.source_zone, $source_min_level: r.source_min_level,
       $drop_chance: r.drop_chance, $vendor_cost_copper: r.vendor_cost_copper,
-      $quest_choice_group: r.quest_choice_group,
+      $quest_choice_group: r.quest_choice_group, $race_mask: r.race_mask,
     });
   });
   insertSrc(sources);

@@ -10,6 +10,7 @@ CREATE TABLE items (
   slot INTEGER NOT NULL,
   subclass INTEGER NOT NULL,
   class_mask INTEGER NOT NULL,
+  race_mask INTEGER NOT NULL DEFAULT 0,
   stats_json TEXT NOT NULL,
   weapon_min_dmg REAL,
   weapon_max_dmg REAL,
@@ -26,6 +27,7 @@ CREATE TABLE item_sources (
   drop_chance REAL,
   vendor_cost_copper INTEGER,
   quest_choice_group INTEGER,
+  race_mask INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (item_id) REFERENCES items(id)
 );
 

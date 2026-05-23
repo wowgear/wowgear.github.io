@@ -7,9 +7,11 @@ export interface ProjectedItem {
   quality: number;
   item_level: number;
   required_level: number;
+  required_honor_rank: number;
   slot: number;
   subclass: number;
   class_mask: number;
+  race_mask: number;
   stats_json: string;
   weapon_min_dmg: number | null;
   weapon_max_dmg: number | null;
@@ -31,6 +33,7 @@ export interface ProjectedSource {
   drop_chance: number | null;
   vendor_cost_copper: number | null;
   quest_choice_group: number | null;
+  race_mask: number;
 }
 
 const STAT_TYPE_MAP: Record<number, string> = {
@@ -102,6 +105,7 @@ export function projectItems(items: ParsedTable, expansionMinPatch = 2): Project
     const quality = num(r.Quality ?? r.quality);
     const inv = num(r.InventoryType ?? r.inventorytype);
     const allowableClass = num(r.AllowableClass ?? r.allowableclass);
+    const allowableRace = num(r.AllowableRace ?? r.allowablerace);
     const subclass = num(r.subclass);
     const expansion = expansionMinPatch >= 2 && itemLevel >= 90 ? 2 : 1;
 
@@ -128,6 +132,7 @@ export function projectItems(items: ParsedTable, expansionMinPatch = 2): Project
 
     const flags = num(r.Flags ?? r.flags);
     const duration = num(r.Duration ?? r.duration);
+    const honorRank = num(r.requiredhonorrank ?? r.RequiredHonorRank);
 
     out.push({
       id,
@@ -135,9 +140,11 @@ export function projectItems(items: ParsedTable, expansionMinPatch = 2): Project
       quality,
       item_level: itemLevel,
       required_level: requiredLevel,
+      required_honor_rank: honorRank,
       slot: inv,
       subclass,
       class_mask: allowableClass < 0 ? 0 : allowableClass,
+      race_mask: allowableRace < 0 ? 0 : allowableRace,
       stats_json: JSON.stringify(stats),
       weapon_min_dmg: wmin,
       weapon_max_dmg: wmax,

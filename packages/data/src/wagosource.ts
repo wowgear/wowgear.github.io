@@ -105,6 +105,7 @@ export function readWagoCraftSources(dir: string, knownItems: Set<number>): Proj
       drop_chance: null,
       vendor_cost_copper: null,
       quest_choice_group: null,
+      race_mask: 0,
     });
     kept++;
   }

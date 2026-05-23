@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ClassName, Spec } from '@wowgear/core';
+import type { ClassName, Faction, Spec } from '@wowgear/core';
 import { CLASS_MIN_LEVEL, SPEC_BY_CLASS } from '@wowgear/core';
 
 export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
@@ -25,6 +25,7 @@ export interface CharState {
   cls: ClassName;
   spec: Spec;
   level: number;
+  faction: Faction;
   drop: boolean;
   dungeon: boolean;
   quest: boolean;
@@ -38,9 +39,12 @@ export interface CharState {
 const DEFAULT: CharState = {
   expansion: 'vanilla',
   cls: 'rogue', spec: 'combat', level: 22,
+  faction: 'any',
   drop: true, dungeon: true, quest: true, vendor: true, profession: true,
   raid: false, pvp: false, holiday: false,
 };
+
+const FACTIONS: ReadonlySet<Faction> = new Set(['any', 'alliance', 'horde']);
 
 function parse(search: string): CharState {
   const p = new URLSearchParams(search);
@@ -57,8 +61,10 @@ function parse(search: string): CharState {
   const level = Number.isFinite(lvl)
     ? Math.min(cap, Math.max(classMin, Math.round(lvl)))
     : Math.min(cap, Math.max(classMin, DEFAULT.level));
+  const wantedFaction = p.get('faction') as Faction | null;
+  const faction: Faction = wantedFaction && FACTIONS.has(wantedFaction) ? wantedFaction : DEFAULT.faction;
   return {
-    expansion, cls, spec, level,
+    expansion, cls, spec, level, faction,
     drop: p.get('drop') !== '0',
     dungeon: p.get('dungeon') !== '0',
     quest: p.get('quest') !== '0',
@@ -74,6 +80,7 @@ function serialize(s: CharState): string {
   const parts: string[] = [];
   if (s.expansion !== DEFAULT.expansion) parts.push(`expansion=${s.expansion}`);
   parts.push(`class=${s.cls}`, `spec=${s.spec}`, `level=${s.level}`);
+  if (s.faction !== DEFAULT.faction) parts.push(`faction=${s.faction}`);
   if (!s.drop) parts.push('drop=0');
   if (!s.dungeon) parts.push('dungeon=0');
   if (!s.quest) parts.push('quest=0');
@@ -107,6 +114,7 @@ export function useUrlState(): [CharState, (next: Partial<CharState>) => void] {
         cls,
         spec: safeSpecs.includes(candidate.spec) ? candidate.spec : safeSpecs[0]!,
         level: Math.min(cap, Math.max(classMin, Math.round(candidate.level))),
+        faction: FACTIONS.has(candidate.faction) ? candidate.faction : DEFAULT.faction,
         drop: candidate.drop,
         dungeon: candidate.dungeon,
         quest: candidate.quest,

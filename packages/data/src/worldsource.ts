@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ALLIANCE_RACE_MASK, HORDE_RACE_MASK } from '@wowgear/core/types';
 import { parseDumpSql, rowToObject, type ParsedTable } from './dump.js';
 import type { ProjectedSource } from './project.js';
+import { loadFactionTemplate, vendorRaceMask, type FactionAllow } from './factiontemplate.js';
+
+const FACTION_EXCLUSIVE_MAPS: Record<number, number> = {
+  449: ALLIANCE_RACE_MASK,
+  450: HORDE_RACE_MASK,
+};
 
 const TABLES = new Set([
   'creature_template',
@@ -26,12 +34,14 @@ interface CreatureInfo {
   name: string;
   minLevel: number;
   maxLevel: number;
+  faction: number;
 }
 
 interface QuestInfo {
   title: string;
   minLevel: number;
   questLevel: number;
+  method: number;
 }
 
 interface GameObjectInfo {
@@ -196,7 +206,7 @@ function buildHolidaySets(tables: Map<string, ParsedTable>): {
   return { holidayEntries, holidayQuests };
 }
 
-export function readWorldSources(path: string, knownItems: Set<number>): WorldSources {
+export function readWorldSources(path: string, knownItems: Set<number>, wagoDir?: string | null): WorldSources {
   console.log(`[world] reading ${path}`);
   const sql = readFileSync(path, 'utf8');
   console.log(`[world] parsing (${(sql.length / 1024 / 1024).toFixed(1)} MB)`);
@@ -216,9 +226,15 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
         name: str(o.Name),
         minLevel: num(o.MinLevel),
         maxLevel: num(o.MaxLevel),
+        faction: num(o.Faction ?? o.faction_A ?? o.faction),
       }))
     : new Map();
   console.log(`[world] ${creatures.size} creatures`);
+
+  const factionAllow: FactionAllow = wagoDir
+    ? loadFactionTemplate(join(wagoDir, 'FactionTemplate.csv'))
+    : new Map();
+  if (factionAllow.size > 0) console.log(`[world] FactionTemplate loaded: ${factionAllow.size} entries`);
 
   const instanceMaps = new Set<number>();
   if (instanceTemplate) {
@@ -230,13 +246,18 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
   console.log(`[world] ${instanceMaps.size} instance maps`);
 
   const dungeonCreatures = new Set<number>();
-  if (creatureSpawn && instanceMaps.size > 0) {
+  const creatureMapMask = new Map<number, number>();
+  if (creatureSpawn) {
     for (const row of creatureSpawn.rows) {
       const o = rowToObject(creatureSpawn, row);
-      if (instanceMaps.has(num(o.map))) dungeonCreatures.add(num(o.id));
+      const id = num(o.id);
+      const map = num(o.map);
+      if (instanceMaps.has(map)) dungeonCreatures.add(id);
+      const mapMask = FACTION_EXCLUSIVE_MAPS[map];
+      if (mapMask) creatureMapMask.set(id, mapMask);
     }
   }
-  console.log(`[world] ${dungeonCreatures.size} dungeon creature entries`);
+  console.log(`[world] ${dungeonCreatures.size} dungeon creature entries, ${creatureMapMask.size} faction-exclusive-map spawns`);
 
   const { holidayEntries, holidayQuests } = buildHolidaySets(tables);
 
@@ -264,6 +285,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
         drop_chance: r.chance > 0 && r.chance <= 100 ? r.chance / 100 : null,
         vendor_cost_copper: null,
         quest_choice_group: null,
+        race_mask: creatureMapMask.get(r.entry) ?? vendorRaceMask(factionAllow, c.faction),
       });
       itemsCovered.add(r.item);
     }
@@ -291,6 +313,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
         drop_chance: null,
         vendor_cost_copper: null,
         quest_choice_group: null,
+        race_mask: creatureMapMask.get(vendor) ?? (c ? vendorRaceMask(factionAllow, c.faction) : 0),
       });
       itemsCovered.add(item);
       added++;
@@ -303,6 +326,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       title: str(o.Title),
       minLevel: num(o.MinLevel),
       questLevel: num(o.QuestLevel),
+      method: num(o.Method),
     }));
 
     let added = 0;
@@ -311,8 +335,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       const questId = num(o.entry);
       const q = quests.get(questId);
       if (!q || !q.title) continue;
-      if (/^(BETA|TEST|DEPRECATED|GM |NYI)/i.test(q.title)) continue;
-      if (/\b(Test Quest|NYI)\b/i.test(q.title)) continue;
+      if (q.method !== 2) continue;
       const fromQuestLevel = q.questLevel > 0 ? q.questLevel - 5 : 0;
       const minLevel = Math.max(1, Math.max(q.minLevel, fromQuestLevel));
       const choiceItems = new Set<number>();
@@ -329,6 +352,8 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
       const choiceGroup = choiceItems.size > 0 ? questId : null;
       const isHoliday = holidayQuests.has(questId);
       const questType: ProjectedSource['source_type'] = isHoliday ? 'holiday' : 'quest';
+      const requiredRaces = num(o.RequiredRaces);
+      const questRaceMask = requiredRaces > 0 ? requiredRaces : 0;
       for (const item of choiceItems) {
         if (!knownItems.has(item)) continue;
         out.push({
@@ -340,6 +365,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: choiceGroup,
+          race_mask: questRaceMask,
         });
         itemsCovered.add(item);
         added++;
@@ -355,6 +381,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: null,
+          race_mask: questRaceMask,
         });
         itemsCovered.add(item);
         added++;
@@ -387,6 +414,7 @@ export function readWorldSources(path: string, knownItems: Set<number>): WorldSo
         drop_chance: chance > 0 && chance <= 100 ? chance / 100 : null,
         vendor_cost_copper: null,
         quest_choice_group: null,
+        race_mask: 0,
       });
       itemsCovered.add(item);
       added++;

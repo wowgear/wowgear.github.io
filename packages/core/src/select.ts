@@ -6,11 +6,13 @@ import {
   ARMOR_SUBCLASS,
   CLASS_MASK,
   DISPLAY_SLOTS,
+  raceMaskAllows,
   RELIC_BY_CLASS,
   SHIELD_CLASSES,
   SLOT,
   WEAPON_SLOTS,
   type ClassName,
+  type Faction,
   type Item,
   type ItemSource,
   type RankedItem,
@@ -24,6 +26,7 @@ export interface BestPerSlotArgs {
   weights: StatWeights;
   charLevel: number;
   charClass: ClassName;
+  faction: Faction;
   topN?: number;
 }
 
@@ -36,9 +39,10 @@ const SLOT_GROUPS: Record<number, Slot[]> = {
   [SLOT.Ranged]:   [SLOT.Ranged, SLOT.RangedRight, SLOT.Thrown, SLOT.Relic],
 };
 
-function isEquippable(item: Item, charLevel: number, classBit: number, cls: ClassName, armorOk: ReadonlySet<number>): boolean {
+function isEquippable(item: Item, charLevel: number, classBit: number, cls: ClassName, armorOk: ReadonlySet<number>, faction: Faction): boolean {
   if (item.required_level > charLevel) return false;
   if (item.class_mask !== 0 && (item.class_mask & classBit) === 0) return false;
+  if (!raceMaskAllows(item.race_mask, faction)) return false;
   if (WEAPON_SLOTS.has(item.slot) && !ALLOWED_WEAPON_SUBCLASS[cls].has(item.subclass)) return false;
   if (ARMOR_SLOTS.has(item.slot) && !armorOk.has(item.subclass)) return false;
   if (item.slot === SLOT.Shield) {
@@ -55,10 +59,12 @@ function isEquippable(item: Item, charLevel: number, classBit: number, cls: Clas
   return true;
 }
 
-function isObtainable(sources: ItemSource[] | undefined, charLevel: number): boolean {
+function isObtainable(sources: ItemSource[] | undefined, charLevel: number, faction: Faction): boolean {
   if (!sources || sources.length === 0) return false;
   for (const s of sources) {
-    if (s.source_min_level == null || s.source_min_level <= charLevel) return true;
+    if (s.source_min_level != null && s.source_min_level > charLevel) continue;
+    if (!raceMaskAllows(s.race_mask, faction)) continue;
+    return true;
   }
   return false;
 }
@@ -81,7 +87,7 @@ function dedupeByQuestChoice(ranked: RankedItem[]): RankedItem[] {
 }
 
 export function bestPerSlot(args: BestPerSlotArgs): Record<number, RankedItem[]> {
-  const { items, sources, weights, charLevel, charClass, topN = TOP_N_DEFAULT } = args;
+  const { items, sources, weights, charLevel, charClass, faction, topN = TOP_N_DEFAULT } = args;
   const classBit = CLASS_MASK[charClass];
 
   const byDisplaySlot = new Map<Slot, RankedItem[]>();
@@ -90,9 +96,9 @@ export function bestPerSlot(args: BestPerSlotArgs): Record<number, RankedItem[]>
   const armorOk = allowedArmorSubclass(charClass, charLevel);
 
   for (const item of items) {
-    if (!isEquippable(item, charLevel, classBit, charClass, armorOk)) continue;
+    if (!isEquippable(item, charLevel, classBit, charClass, armorOk, faction)) continue;
     const itemSources = sources.get(item.id);
-    if (!isObtainable(itemSources, charLevel)) continue;
+    if (!isObtainable(itemSources, charLevel, faction)) continue;
 
     const score = scoreItem(item, weights);
     if (score <= 0) continue;

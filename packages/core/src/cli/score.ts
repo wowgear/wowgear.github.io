@@ -74,7 +74,7 @@ function main(): void {
 
   const rawItems = db.prepare('SELECT * FROM items').all() as Array<{
     id: number; name: string; quality: number; item_level: number; required_level: number;
-    slot: number; subclass: number; class_mask: number; stats_json: string;
+    slot: number; subclass: number; class_mask: number; race_mask: number | null; stats_json: string;
     weapon_min_dmg: number | null; weapon_max_dmg: number | null; weapon_speed: number | null;
     expansion: number;
   }>;
@@ -82,6 +82,7 @@ function main(): void {
   const items: Item[] = rawItems.map((r) => ({
     ...r,
     slot: r.slot as Item['slot'],
+    race_mask: r.race_mask ?? 0,
     stats: JSON.parse(r.stats_json),
     expansion: (r.expansion === 2 ? 2 : 1) as Item['expansion'],
   }));
@@ -98,7 +99,7 @@ function main(): void {
   }
 
   const w = weightsFor(cls, spec, bucketForLevel(level));
-  const result = bestPerSlot({ items, sources, weights: w, charLevel: level, charClass: cls });
+  const result = bestPerSlot({ items, sources, weights: w, charLevel: level, charClass: cls, faction: 'any' });
 
   const filterDesc = [raid && 'raid', pvp && 'pvp', holiday && 'holiday'].filter(Boolean).join('+') || 'no raid/pvp/holiday';
   console.log(`\n${cls}/${spec} level ${level} — bucket ${bucketForLevel(level)} (${filterDesc})\n`);
