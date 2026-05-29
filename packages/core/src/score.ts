@@ -17,7 +17,3 @@ export function scoreItem(item: Item, weights: StatWeights): number {
 
   return score;
 }
-
-export function scoreWeaponPair(mh: Item, oh: Item, weights: StatWeights): number {
-  return scoreItem(mh, weights) + scoreItem(oh, weights) * 0.5;
-}

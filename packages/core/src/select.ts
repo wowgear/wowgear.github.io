@@ -86,6 +86,11 @@ function dedupeByQuestChoice(ranked: RankedItem[]): RankedItem[] {
   return out;
 }
 
+function rank(list: RankedItem[], topN: number): RankedItem[] {
+  const sorted = [...list].sort((a, b) => b.score - a.score);
+  return dedupeByQuestChoice(sorted).slice(0, topN);
+}
+
 export function bestPerSlot(args: BestPerSlotArgs): Record<number, RankedItem[]> {
   const { items, sources, weights, charLevel, charClass, faction, topN = TOP_N_DEFAULT } = args;
   const classBit = CLASS_MASK[charClass];
@@ -115,8 +120,29 @@ export function bestPerSlot(args: BestPerSlotArgs): Record<number, RankedItem[]>
 
   const result: Record<number, RankedItem[]> = {};
   for (const [slot, list] of byDisplaySlot) {
-    list.sort((a, b) => b.score - a.score);
-    result[slot] = dedupeByQuestChoice(list).slice(0, topN);
+    if (slot === SLOT.MainHand || slot === SLOT.OffHand) continue;
+    result[slot] = rank(list, topN);
   }
+
+  // A two-hander occupies both hands, so the weapon recommendation is the better of two
+  // configurations: best two-hander alone, or best one-hander + best off-hand. Present the winner.
+  const mh = byDisplaySlot.get(SLOT.MainHand)!;
+  const twoHand = rank(mh.filter((r) => r.item.slot === SLOT.TwoHand), topN);
+  const oneHand = rank(mh.filter((r) => r.item.slot !== SLOT.TwoHand), topN);
+  const offHand = rank(byDisplaySlot.get(SLOT.OffHand)!, topN);
+
+  const twoHandScore = twoHand[0]?.score ?? -Infinity;
+  const oneHandScore = oneHand[0]?.score ?? -Infinity;
+  const offHandScore = offHand[0]?.score ?? 0;
+  const oneHandConfig = oneHandScore === -Infinity ? -Infinity : oneHandScore + offHandScore;
+
+  if (oneHandConfig > twoHandScore) {
+    result[SLOT.MainHand] = oneHand;
+    result[SLOT.OffHand] = offHand;
+  } else {
+    result[SLOT.MainHand] = twoHand;
+    result[SLOT.OffHand] = [];
+  }
+
   return result;
 }
