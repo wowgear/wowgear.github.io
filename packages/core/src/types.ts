@@ -24,6 +24,8 @@ export type Spec =
 
 export type LevelBucket = '1-19' | '20-39' | '40-59' | '60-70' | '70-80';
 
+export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
+
 export const CLASS_MASK: Record<ClassName, number> = {
   warrior:     1 << 0,
   paladin:     1 << 1,
@@ -207,6 +209,9 @@ export interface Stats {
   ap?: number; rap?: number;
   hit_rating?: number; crit_rating?: number; haste_rating?: number;
   expertise_rating?: number; armor_pen?: number;
+  // vanilla flat percentages (pre-2.0 rating system); distinct unit from *_rating
+  crit_pct?: number; hit_pct?: number; spell_crit_pct?: number; spell_hit_pct?: number;
+  dodge_pct?: number; parry_pct?: number; block_pct?: number; defense_skill?: number;
   // caster
   spellpower?: number;
   sp_arcane?: number; sp_fire?: number; sp_frost?: number;

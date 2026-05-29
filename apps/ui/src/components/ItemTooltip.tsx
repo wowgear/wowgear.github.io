@@ -11,6 +11,8 @@ const STAT_LABELS: Record<string, string> = {
   ap: 'Attack Power', rap: 'Ranged Attack Power',
   hit_rating: 'Hit Rating', crit_rating: 'Crit Rating', haste_rating: 'Haste Rating',
   expertise_rating: 'Expertise Rating', armor_pen: 'Armor Penetration',
+  crit_pct: 'Crit %', hit_pct: 'Hit %', spell_crit_pct: 'Spell Crit %', spell_hit_pct: 'Spell Hit %',
+  dodge_pct: 'Dodge %', parry_pct: 'Parry %', block_pct: 'Block %', defense_skill: 'Defense',
   spellpower: 'Spell Power', sp_arcane: 'Arcane Damage', sp_fire: 'Fire Damage',
   sp_frost: 'Frost Damage', sp_nature: 'Nature Damage', sp_shadow: 'Shadow Damage',
   sp_holy: 'Holy Damage', sp_healing: 'Healing',

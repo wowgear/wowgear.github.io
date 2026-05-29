@@ -14,9 +14,11 @@ interface Props {
   picked: RankedItem | null;
   expansion: Expansion;
   onPick: (item: RankedItem) => void;
+  onSelect?: (item: RankedItem | null) => void;
+  disabledNote?: string | null;
 }
 
-export function SlotCard({ label, list, picked, expansion, onPick }: Props): JSX.Element {
+export function SlotCard({ label, list, picked, expansion, onPick, onSelect, disabledNote }: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [hover, setHover] = useState(false);
@@ -37,6 +39,19 @@ export function SlotCard({ label, list, picked, expansion, onPick }: Props): JSX
   }, [open]);
 
   const selected = list[selectedIdx] ?? list[0];
+
+  useEffect(() => {
+    onSelect?.(selected ?? null);
+  }, [selected, onSelect]);
+
+  if (disabledNote) {
+    return (
+      <div className="bg-panel2 border border-black/40 rounded px-3 py-2 opacity-60">
+        <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
+        <div className="text-muted text-xs italic">{disabledNote}</div>
+      </div>
+    );
+  }
 
   if (!selected) {
     return (

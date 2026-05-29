@@ -7,12 +7,14 @@ import {
   SLOT,
   weightsFor,
   type ClassName,
+  type Expansion,
   type Item,
   type ItemSource,
   type Spec,
 } from '../index.js';
 
 interface Args {
+  expansion: Expansion;
   cls: ClassName;
   spec: Spec;
   level: number;
@@ -55,13 +57,14 @@ function parseArgs(argv: string[]): Args {
     map.set(name, argv[i + 1] ?? '');
     i++;
   }
+  const expansion = (map.get('expansion') ?? 'tbc') as Expansion;
   const cls = (map.get('class') ?? 'rogue') as ClassName;
   const spec = (map.get('spec') ?? 'combat') as Spec;
   const level = Number(map.get('level') ?? '22');
-  const defDb = resolve(import.meta.dir, '../../../../apps/ui/public/tbc.sqlite');
+  const defDb = resolve(import.meta.dir, `../../../../apps/ui/public/${expansion}.sqlite`);
   const db = map.get('db') ? resolve(map.get('db')!) : defDb;
   return {
-    cls, spec, level, db,
+    expansion, cls, spec, level, db,
     raid: flags.has('raid'),
     pvp: flags.has('pvp'),
     holiday: flags.has('holiday'),
@@ -69,7 +72,7 @@ function parseArgs(argv: string[]): Args {
 }
 
 function main(): void {
-  const { cls, spec, level, db: dbPath, raid, pvp, holiday } = parseArgs(process.argv.slice(2));
+  const { expansion, cls, spec, level, db: dbPath, raid, pvp, holiday } = parseArgs(process.argv.slice(2));
   const db = new Database(dbPath, { readonly: true });
 
   const rawItems = db.prepare('SELECT * FROM items').all() as Array<{
@@ -98,7 +101,7 @@ function main(): void {
     else sources.set(s.item_id, [s]);
   }
 
-  const w = weightsFor(cls, spec, bucketForLevel(level));
+  const w = weightsFor(expansion, cls, spec, bucketForLevel(level));
   const result = bestPerSlot({ items, sources, weights: w, charLevel: level, charClass: cls, faction: 'any' });
 
   const filterDesc = [raid && 'raid', pvp && 'pvp', holiday && 'holiday'].filter(Boolean).join('+') || 'no raid/pvp/holiday';

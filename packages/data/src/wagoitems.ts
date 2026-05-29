@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProjectedItem } from './project.js';
+import { readEquipAuraStats } from './itemauras.js';
 
 const ITEM_FLAG_CONJURED = 0x2;
 const ITEM_FLAG_DEPRECATED = 0x10;
@@ -14,9 +15,12 @@ const STAT_TYPE_MAP: Record<number, string> = {
   28: 'haste_rating', 29: 'haste_rating', 30: 'spell_haste_rating',
   31: 'hit_rating', 32: 'crit_rating', 35: 'resilience',
   36: 'haste_rating', 37: 'expertise_rating',
-  38: 'ap', 39: 'rap', 41: 'sp_healing', 42: 'mp5',
-  43: 'armor_pen', 45: 'spellpower',
+  38: 'ap', 39: 'rap', 40: 'ap', 41: 'sp_healing', 42: 'spellpower',
+  43: 'mp5', 44: 'armor_pen', 45: 'spellpower', 47: 'spell_penetration', 48: 'block_value',
 };
+
+// ItemSparse Resistances_0 is armor (physical); 1..6 are the magic-school resistances.
+const RESISTANCE_BY_INDEX = ['armor', 'res_holy', 'res_fire', 'res_nature', 'res_frost', 'res_shadow', 'res_arcane'];
 
 function readLine(buf: string, start: number): { line: string; next: number } {
   let i = start;
@@ -116,6 +120,7 @@ export function readWagoItems(dir: string): ProjectedItem[] {
   const first = readLine(buf, 0);
   const header = splitCsv(first.line);
   const reader = makeReader(header);
+  const auraStats = readEquipAuraStats(dir);
 
   const out: ProjectedItem[] = [];
   let pos = first.next;
@@ -158,6 +163,14 @@ export function readWagoItems(dir: string): ProjectedItem[] {
         if (key) stats[key] = (stats[key] ?? 0) + v;
       }
     }
+
+    for (let ri = 0; ri <= 6; ri++) {
+      const rv = reader.num(cols, `Resistances_${ri}`);
+      if (rv !== 0) { const rk = RESISTANCE_BY_INDEX[ri]!; stats[rk] = (stats[rk] ?? 0) + rv; }
+    }
+
+    const extra = auraStats.get(id) as Record<string, number> | undefined;
+    if (extra) for (const k of Object.keys(extra)) stats[k] = (stats[k] ?? 0) + extra[k]!;
 
     const wmin = reader.num(cols, 'MinDamage_0');
     const wmax = reader.num(cols, 'MaxDamage_0');

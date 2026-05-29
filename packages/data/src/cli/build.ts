@@ -81,41 +81,6 @@ const SYNTHETIC_HOLIDAY_PATTERNS: RegExp[] = [
 ];
 
 
-function syntheticSources(items: Map<number, ItemMeta>): ProjectedSource[] {
-  const out: ProjectedSource[] = [];
-  for (const [id, meta] of items) {
-    const isTbc = id >= 24000;
-    const fromIlvl = isTbc
-      ? meta.item_level - 25
-      : meta.item_level <= 92 ? meta.item_level - 8 : meta.item_level - 22;
-    const base = meta.required_level > 0 ? meta.required_level : fromIlvl;
-    const min = Math.min(70, Math.max(1, base));
-
-    const pvp = meta.required_honor_rank > 0;
-    const raid = !pvp && (isVanillaRaidLoot(id, meta.item_level, meta.quality) || isTbcRaidLoot(id, meta.item_level, meta.quality));
-
-    const sourceType: ProjectedSource['source_type'] = pvp ? 'pvp' : raid ? 'raid' : 'drop';
-    const sourceName = pvp
-      ? 'PvP reward'
-      : raid
-        ? (id >= 24000 ? 'TBC raid' : 'Vanilla 40-man raid')
-        : 'World / dungeon / quest';
-
-    out.push({
-      item_id: id,
-      source_type: sourceType,
-      source_name: sourceName,
-      source_zone: null,
-      source_min_level: min,
-      drop_chance: null,
-      vendor_cost_copper: null,
-      quest_choice_group: null,
-      race_mask: 0,
-    });
-  }
-  return out;
-}
-
 interface RaidSourceRow {
   id: number;
   name: string;
@@ -220,6 +185,8 @@ function main(): void {
   });
 
   const knownItems = new Set(itemMeta.keys());
+  const reqLevels = new Map<number, number>();
+  for (const [id, m] of itemMeta) reqLevels.set(id, m.required_level);
   const sources: ProjectedSource[] = [];
   let realSourceItems = new Set<number>();
 
@@ -228,8 +195,8 @@ function main(): void {
     if (!existsSync(path)) {
       console.warn(`[ingest] world DB not found: ${path}`);
     } else {
-      const ws = readWorldSources(path, knownItems, wago);
-      sources.push(...ws.sources);
+      const ws = readWorldSources(path, knownItems, reqLevels, wago);
+      for (const s of ws.sources) sources.push(s);
       realSourceItems = ws.itemsCovered;
     }
   }
@@ -240,19 +207,11 @@ function main(): void {
       console.warn(`[ingest] wago dir not found: ${path}`);
     } else {
       const wagoSources = readWagoCraftSources(path, knownItems);
-      sources.push(...wagoSources);
+      for (const s of wagoSources) sources.push(s);
       for (const s of wagoSources) realSourceItems.add(s.item_id);
     }
   }
 
-
-  let synthetic = 0;
-  for (const [id, meta] of itemMeta) {
-    if (realSourceItems.has(id)) continue;
-    sources.push(...syntheticSources(new Map([[id, meta]])));
-    synthetic++;
-  }
-  console.log(`[ingest] ${synthetic} items received synthetic sources (no world data)`);
 
   if (thatsmybis) {
     const dir = resolve(thatsmybis);
@@ -260,7 +219,7 @@ function main(): void {
       console.warn(`[ingest] thatsmybis dir not found: ${dir}`);
     } else {
       const raidSources = readThatsmybisSources(dir, knownItems);
-      sources.push(...raidSources);
+      for (const s of raidSources) sources.push(s);
       console.log(`[ingest] added ${raidSources.length} raid sources from thatsmybis`);
     }
   }
@@ -288,7 +247,11 @@ function main(): void {
       reclassifiedHoliday++;
     }
   }
-  console.log(`[ingest] reclassified ${reclassifiedRaid} sources as raid, ${reclassifiedPvp} as pvp, ${reclassifiedHoliday} as holiday (synthetic fallback)`);
+  console.log(`[ingest] reclassified ${reclassifiedRaid} sources as raid, ${reclassifiedPvp} as pvp, ${reclassifiedHoliday} as holiday`);
+
+  const itemsWithSource = new Set(sources.map((s) => s.item_id));
+  const keptItems = items.filter((it) => itemsWithSource.has(it.id));
+  console.log(`[ingest] dropped ${items.length - keptItems.length} items with no real source; keeping ${keptItems.length}`);
 
   mkdirSync(dirname(out), { recursive: true });
   const db = new Database(out, { create: true });
@@ -308,7 +271,7 @@ function main(): void {
       $weapon_speed: r.weapon_speed, $expansion: r.expansion,
     });
   });
-  insertItems(items);
+  insertItems(keptItems);
 
   const insSrc = db.prepare(`
     INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group, race_mask)
@@ -326,7 +289,7 @@ function main(): void {
 
   db.exec('VACUUM;');
   db.close();
-  console.log(`[ingest] wrote ${items.length} items + ${sources.length} sources to ${out}`);
+  console.log(`[ingest] wrote ${keptItems.length} items + ${sources.length} sources to ${out}`);
 }
 
 main();

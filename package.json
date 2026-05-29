@@ -2,6 +2,7 @@
   "name": "wowgear",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 build",

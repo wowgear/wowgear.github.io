@@ -1,6 +1,7 @@
-import type { ClassName, LevelBucket, Spec, StatWeights } from './types.js';
+import type { ClassName, Expansion, LevelBucket, Spec, StatWeights } from './types.js';
 
-type SpecWeights = Record<LevelBucket, StatWeights>;
+type SpecWeights = Partial<Record<LevelBucket, StatWeights>>;
+type ClassWeights = Record<ClassName, Partial<Record<Spec, SpecWeights>>>;
 
 const ROGUE_SUBTLETY: SpecWeights = {
   '1-19': {
@@ -148,6 +149,7 @@ const HEALER = (mul: number): SpecWeights => {
   const make = (factor: number): StatWeights => ({
     int: 0.6 * factor, sta: 0.2, spi: 0.5 * factor,
     sp_healing: 1.0 * factor,
+    spellpower: 0.8 * factor,
     spell_crit_rating: 0.8 * factor,
     spell_haste_rating: 1.0 * factor,
     mp5: 1.1 * factor,
@@ -233,7 +235,8 @@ const DK_BLOOD: SpecWeights = {
   '70-80': TANK(1.15, false),
 };
 
-export const weights: Record<ClassName, Partial<Record<Spec, SpecWeights>>> = {
+// TBC and WotLK itemize secondary stats as combat ratings, which these weights are keyed on.
+const RATING_WEIGHTS: ClassWeights = {
   rogue:       { combat: ROGUE_COMBAT, subtlety: ROGUE_SUBTLETY },
   warrior:     { arms: WARRIOR_ARMS, fury: WARRIOR_FURY, prot: WARRIOR_PROT },
   hunter:      { bm: HUNTER_BM },
@@ -246,8 +249,63 @@ export const weights: Record<ClassName, Partial<Record<Spec, SpecWeights>>> = {
   deathknight: { blood: DK_BLOOD, frost: DK_FROST, unholy: DK_UNHOLY },
 };
 
-export function weightsFor(cls: ClassName, spec: Spec, bucket: LevelBucket): StatWeights {
-  const sw = weights[cls]?.[spec];
-  if (!sw) throw new Error(`No weights for ${cls}/${spec}`);
-  return sw[bucket];
+// Vanilla had no rating system: secondary stats are flat percentages. Convert each rating
+// weight to its %-equivalent using level-60 rating-per-1% constants, and drop stats that did
+// not exist on vanilla gear. Primaries, spell power/healing, AP, mp5, weapon DPS share units.
+const RATING_TO_PCT: Partial<Record<keyof StatWeights, [keyof StatWeights, number]>> = {
+  crit_rating: ['crit_pct', 14],
+  hit_rating: ['hit_pct', 10],
+  spell_crit_rating: ['spell_crit_pct', 14],
+  spell_hit_rating: ['spell_hit_pct', 8],
+  dodge_rating: ['dodge_pct', 14],
+  parry_rating: ['parry_pct', 14],
+  block_rating: ['block_pct', 16],
+  defense_rating: ['defense_skill', 1.5],
+};
+const VANILLA_ABSENT: ReadonlySet<keyof StatWeights> = new Set([
+  'haste_rating', 'spell_haste_rating', 'expertise_rating', 'armor_pen', 'resilience', 'block_value',
+]);
+
+function toVanillaStatWeights(w: StatWeights): StatWeights {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(w) as [keyof StatWeights, number | undefined][]) {
+    if (v == null || VANILLA_ABSENT.has(k)) continue;
+    const conv = RATING_TO_PCT[k];
+    const key = conv ? conv[0] : k;
+    out[key] = (out[key] ?? 0) + v * (conv ? conv[1] : 1);
+  }
+  return out;
+}
+
+function toVanillaWeights(cw: ClassWeights): ClassWeights {
+  const out = {} as ClassWeights;
+  for (const cls of Object.keys(cw) as ClassName[]) {
+    const specs = cw[cls];
+    const o: Partial<Record<Spec, SpecWeights>> = {};
+    for (const spec of Object.keys(specs) as Spec[]) {
+      const sw = specs[spec]!;
+      const vsw: SpecWeights = {};
+      for (const [bucket, w] of Object.entries(sw) as [LevelBucket, StatWeights][]) {
+        if (bucket === '70-80') continue;
+        vsw[bucket] = toVanillaStatWeights(w);
+      }
+      o[spec] = vsw;
+    }
+    out[cls] = o;
+  }
+  return out;
+}
+
+export const weights: Record<Expansion, ClassWeights> = {
+  vanilla: toVanillaWeights(RATING_WEIGHTS),
+  tbc: RATING_WEIGHTS,
+  wotlk: RATING_WEIGHTS,
+};
+
+export function weightsFor(expansion: Expansion, cls: ClassName, spec: Spec, bucket: LevelBucket): StatWeights {
+  const sw = weights[expansion][cls]?.[spec];
+  if (!sw) throw new Error(`No weights for ${expansion}/${cls}/${spec}`);
+  const w = sw[bucket];
+  if (!w) throw new Error(`No weights for ${expansion}/${cls}/${spec}/${bucket}`);
+  return w;
 }

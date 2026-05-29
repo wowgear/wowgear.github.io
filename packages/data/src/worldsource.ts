@@ -24,10 +24,12 @@ const TABLES = new Set([
   'game_event_creature_data',
   'game_event_quest',
   'instance_template',
+  'instance_encounters',
   'skinning_loot_template',
   'fishing_loot_template',
   'prospecting_loot_template',
   'disenchant_loot_template',
+  'item_loot_template',
 ]);
 
 interface CreatureInfo {
@@ -89,6 +91,65 @@ function readLoot(t: ParsedTable): LootRow[] {
       chance: num(o.ChanceOrQuestChance),
       mincountOrRef: num(o.mincountOrRef),
     });
+  }
+  return out;
+}
+
+// mangos loot rows with mincountOrRef < 0 are references into reference_loot_template
+// (the row's `item` holds the ref id, not a real item). Resolve refs (nested) to item ids.
+function buildReferenceMap(refTable: ParsedTable | undefined): Map<number, number[]> {
+  const resolved = new Map<number, number[]>();
+  if (!refTable) return resolved;
+  const byEntry = new Map<number, LootRow[]>();
+  for (const r of readLoot(refTable)) {
+    const list = byEntry.get(r.entry);
+    if (list) list.push(r);
+    else byEntry.set(r.entry, [r]);
+  }
+  const resolving = new Set<number>();
+  const resolve = (entry: number): number[] => {
+    const cached = resolved.get(entry);
+    if (cached) return cached;
+    if (resolving.has(entry)) return [];
+    resolving.add(entry);
+    const items: number[] = [];
+    for (const r of byEntry.get(entry) ?? []) {
+      if (r.mincountOrRef < 0) { for (const x of resolve(-r.mincountOrRef)) items.push(x); }
+      else if (r.item > 0) items.push(r.item);
+    }
+    resolving.delete(entry);
+    resolved.set(entry, items);
+    return items;
+  };
+  for (const entry of byEntry.keys()) resolve(entry);
+  return resolved;
+}
+
+function lootItems(r: LootRow, refMap: Map<number, number[]>): number[] {
+  if (r.mincountOrRef < 0) return refMap.get(-r.mincountOrRef) ?? [];
+  return r.item > 0 ? [r.item] : [];
+}
+
+// Shared reference loot tables are referenced by many creatures, so the same item gets
+// hundreds of sources. Keep the lowest-level few per item (dedup by source name+type).
+const MAX_SOURCES_PER_ITEM = 12;
+function capPerItem(all: ProjectedSource[]): ProjectedSource[] {
+  const byItem = new Map<number, ProjectedSource[]>();
+  for (const s of all) {
+    const list = byItem.get(s.item_id);
+    if (list) list.push(s);
+    else byItem.set(s.item_id, [s]);
+  }
+  const out: ProjectedSource[] = [];
+  for (const list of byItem.values()) {
+    const byName = new Map<string, ProjectedSource>();
+    for (const s of list) {
+      const key = `${s.source_type}|${s.source_name}`;
+      const ex = byName.get(key);
+      if (!ex || (s.source_min_level ?? 9999) < (ex.source_min_level ?? 9999)) byName.set(key, s);
+    }
+    const uniq = [...byName.values()].sort((a, b) => (a.source_min_level ?? 9999) - (b.source_min_level ?? 9999));
+    for (let i = 0; i < uniq.length && i < MAX_SOURCES_PER_ITEM; i++) out.push(uniq[i]!);
   }
   return out;
 }
@@ -206,7 +267,7 @@ function buildHolidaySets(tables: Map<string, ParsedTable>): {
   return { holidayEntries, holidayQuests };
 }
 
-export function readWorldSources(path: string, knownItems: Set<number>, wagoDir?: string | null): WorldSources {
+export function readWorldSources(path: string, knownItems: Set<number>, itemReqLevel: Map<number, number>, wagoDir?: string | null): WorldSources {
   console.log(`[world] reading ${path}`);
   const sql = readFileSync(path, 'utf8');
   console.log(`[world] parsing (${(sql.length / 1024 / 1024).toFixed(1)} MB)`);
@@ -257,42 +318,123 @@ export function readWorldSources(path: string, knownItems: Set<number>, wagoDir?
       if (mapMask) creatureMapMask.set(id, mapMask);
     }
   }
-  console.log(`[world] ${dungeonCreatures.size} dungeon creature entries, ${creatureMapMask.size} faction-exclusive-map spawns`);
+
+  const instanceEncounters = tables.get('instance_encounters');
+  if (instanceEncounters) {
+    for (const row of instanceEncounters.rows) {
+      const o = rowToObject(instanceEncounters, row);
+      if (num(o.creditType) === 0) {
+        const creditEntry = num(o.creditEntry);
+        if (creditEntry > 0) dungeonCreatures.add(creditEntry);
+      }
+    }
+  }
+  console.log(`[world] ${dungeonCreatures.size} dungeon/instance creature entries, ${creatureMapMask.size} faction-exclusive-map spawns`);
 
   const { holidayEntries, holidayQuests } = buildHolidaySets(tables);
 
   const out: ProjectedSource[] = [];
   const itemsCovered = new Set<number>();
 
+  const refMap = buildReferenceMap(tables.get('reference_loot_template'));
+
   if (creatureLoot) {
     const rows = readLoot(creatureLoot);
+    let added = 0;
     for (const r of rows) {
-      if (!knownItems.has(r.item)) continue;
       const c = creatures.get(r.entry);
       if (!c || !c.name) continue;
+      const items = lootItems(r, refMap);
+      if (items.length === 0) continue;
       const label = levelLabel(c.minLevel, c.maxLevel);
       const isHoliday = holidayEntries.has(r.entry);
       const isDungeon = dungeonCreatures.has(r.entry);
       const stype: ProjectedSource['source_type'] = isHoliday
         ? 'holiday'
         : isDungeon ? 'dungeon' : 'drop';
-      out.push({
-        item_id: r.item,
-        source_type: stype,
-        source_name: label ? `${c.name} (${label})` : c.name,
-        source_zone: null,
-        source_min_level: appropriateLevel(c.minLevel, c.maxLevel),
-        drop_chance: r.chance > 0 && r.chance <= 100 ? r.chance / 100 : null,
-        vendor_cost_copper: null,
-        quest_choice_group: null,
-        race_mask: creatureMapMask.get(r.entry) ?? vendorRaceMask(factionAllow, c.faction),
-      });
-      itemsCovered.add(r.item);
+      const name = label ? `${c.name} (${label})` : c.name;
+      const minLevel = appropriateLevel(c.minLevel, c.maxLevel);
+      const raceMask = creatureMapMask.get(r.entry) ?? vendorRaceMask(factionAllow, c.faction);
+      const chance = r.mincountOrRef < 0 ? null : (r.chance > 0 && r.chance <= 100 ? r.chance / 100 : null);
+      for (const item of items) {
+        if (!knownItems.has(item)) continue;
+        out.push({
+          item_id: item,
+          source_type: stype,
+          source_name: name,
+          source_zone: null,
+          source_min_level: minLevel,
+          drop_chance: chance,
+          vendor_cost_copper: null,
+          quest_choice_group: null,
+          race_mask: raceMask,
+        });
+        itemsCovered.add(item);
+        added++;
+      }
     }
-    console.log(`[world] ${rows.length} creature_loot rows → ${out.length} sources so far`);
+    console.log(`[world] ${rows.length} creature_loot rows → ${added} creature sources`);
   }
 
-  // Chests skipped: no reliable level info per gameobject without zone tables.
+  const gameobjectLoot = tables.get('gameobject_loot_template');
+  if (gameobjectLoot) {
+    const goTemplate = tables.get('gameobject_template');
+    const goNames = new Map<number, string>();
+    if (goTemplate) {
+      for (const row of goTemplate.rows) {
+        const o = rowToObject(goTemplate, row);
+        const id = num(o.entry);
+        if (id > 0) goNames.set(id, str(o.name));
+      }
+    }
+    let added = 0;
+    for (const r of readLoot(gameobjectLoot)) {
+      const items = lootItems(r, refMap);
+      if (items.length === 0) continue;
+      const name = goNames.get(r.entry) || `Object #${r.entry}`;
+      for (const item of items) {
+        if (!knownItems.has(item)) continue;
+        out.push({
+          item_id: item,
+          source_type: 'drop',
+          source_name: name,
+          source_zone: null,
+          source_min_level: itemReqLevel.get(item) ?? 1,
+          drop_chance: null,
+          vendor_cost_copper: null,
+          quest_choice_group: null,
+          race_mask: 0,
+        });
+        itemsCovered.add(item);
+        added++;
+      }
+    }
+    console.log(`[world] ${added} gameobject (chest/object) sources`);
+  }
+
+  const itemLoot = tables.get('item_loot_template');
+  if (itemLoot) {
+    let added = 0;
+    for (const r of readLoot(itemLoot)) {
+      for (const item of lootItems(r, refMap)) {
+        if (!knownItems.has(item)) continue;
+        out.push({
+          item_id: item,
+          source_type: 'drop',
+          source_name: 'Contained in another item',
+          source_zone: null,
+          source_min_level: itemReqLevel.get(item) ?? 1,
+          drop_chance: null,
+          vendor_cost_copper: null,
+          quest_choice_group: null,
+          race_mask: 0,
+        });
+        itemsCovered.add(item);
+        added++;
+      }
+    }
+    console.log(`[world] ${added} item-container sources`);
+  }
 
   if (npcVendor) {
     let added = 0;
@@ -422,6 +564,7 @@ export function readWorldSources(path: string, knownItems: Set<number>, wagoDir?
     console.log(`[world] ${added} ${label.toLowerCase()} sources`);
   }
 
-  console.log(`[world] total ${out.length} sources covering ${itemsCovered.size} items`);
-  return { sources: out, itemsCovered };
+  const capped = capPerItem(out);
+  console.log(`[world] ${out.length} raw sources -> ${capped.length} after cap (max ${MAX_SOURCES_PER_ITEM}/item), covering ${itemsCovered.size} items`);
+  return { sources: capped, itemsCovered };
 }

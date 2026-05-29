@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   bestPerSlot,
   bucketForLevel,
@@ -57,6 +57,10 @@ export function App(): JSX.Element {
   const [bundle, setBundle] = useState<DbBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<RankedItem | null>(null);
+  const [mainHandSel, setMainHandSel] = useState<RankedItem | null>(null);
+
+  const onMainHandSelect = useCallback((item: RankedItem | null) => setMainHandSel(item), []);
+  const mainHandTwoHanded = mainHandSel?.item.slot === SLOT.TwoHand;
 
   useEffect(() => {
     setBundle(null);
@@ -90,7 +94,7 @@ export function App(): JSX.Element {
   const results = useMemo(() => {
     if (!bundle || !filteredSources) return null;
     let weights;
-    try { weights = weightsFor(state.cls, state.spec, bucketForLevel(state.level)); }
+    try { weights = weightsFor(state.expansion, state.cls, state.spec, bucketForLevel(state.level)); }
     catch { return null; }
     return bestPerSlot({
       items: bundle.items,
@@ -136,6 +140,8 @@ export function App(): JSX.Element {
                         picked={picked}
                         expansion={state.expansion}
                         onPick={setPicked}
+                        onSelect={slot === SLOT.MainHand ? onMainHandSelect : undefined}
+                        disabledNote={slot === SLOT.OffHand && mainHandTwoHanded ? 'Two-handed equipped' : null}
                       />
                     </div>
                   );

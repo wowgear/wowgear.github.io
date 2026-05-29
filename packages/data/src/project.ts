@@ -62,10 +62,14 @@ const STAT_TYPE_MAP: Record<number, string> = {
   37: 'expertise_rating',
   38: 'ap',
   39: 'rap',
+  40: 'ap',
   41: 'sp_healing',
-  42: 'mp5',
-  43: 'armor_pen',
+  42: 'spellpower',
+  43: 'mp5',
+  44: 'armor_pen',
   45: 'spellpower',
+  47: 'spell_penetration',
+  48: 'block_value',
 };
 
 const RES_MAP: Record<string, string> = {
@@ -157,19 +161,16 @@ export function projectItems(items: ParsedTable, expansionMinPatch = 2): Project
   return out;
 }
 
-const TEST_NAME_RE = /\b(TEST|Test|test|QA|UNUSED|DEPRECATED|JEFF|ALEX|Indalamar)\b|\bScott K\b|\(Test\)/;
-
 export function shouldKeepItem(it: ProjectedItem): boolean {
   if (it.name === '') return false;
   if ((it.flags & ITEM_FLAG_CONJURED) !== 0) return false;
   if ((it.flags & ITEM_FLAG_DEPRECATED) !== 0) return false;
   if (it.duration > 0) return false;
-  if (TEST_NAME_RE.test(it.name)) return false;
   if (it.quality >= 2) return true;
   if (it.slot === 0) return false;
   try {
     const stats = JSON.parse(it.stats_json) as Record<string, number>;
-    if (Object.keys(stats).length > 0) return true;
+    if (Object.keys(stats).some((k) => k !== 'armor' && !k.startsWith('res_'))) return true;
   } catch {}
   return false;
 }

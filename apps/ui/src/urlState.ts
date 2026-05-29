@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { ClassName, Faction, Spec } from '@wowgear/core';
+import type { ClassName, Expansion, Faction, Spec } from '@wowgear/core';
 import { CLASS_MIN_LEVEL, SPEC_BY_CLASS } from '@wowgear/core';
 
-export type Expansion = 'vanilla' | 'tbc' | 'wotlk';
+export type { Expansion };
 
 export const LEVEL_CAP: Record<Expansion, number> = { vanilla: 60, tbc: 70, wotlk: 80 };
 
