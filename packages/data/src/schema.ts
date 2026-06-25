@@ -27,6 +27,8 @@ CREATE TABLE item_sources (
   drop_chance REAL,
   vendor_cost_copper INTEGER,
   quest_choice_group INTEGER,
+  source_entity_kind TEXT,
+  source_entity_id INTEGER,
   race_mask INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (item_id) REFERENCES items(id)
 );

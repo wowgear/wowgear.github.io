@@ -33,6 +33,8 @@ export interface ProjectedSource {
   drop_chance: number | null;
   vendor_cost_copper: number | null;
   quest_choice_group: number | null;
+  source_entity_kind?: 'npc' | 'object' | 'quest' | 'item' | null;
+  source_entity_id?: number | null;
   race_mask: number;
 }
 

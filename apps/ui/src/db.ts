@@ -93,6 +93,8 @@ export function loadAll(db: Database): DbBundle {
         drop_chance: obj.drop_chance as number | null,
         vendor_cost_copper: obj.vendor_cost_copper as number | null,
         quest_choice_group: obj.quest_choice_group as number | null,
+        source_entity_kind: (obj.source_entity_kind as ItemSource['source_entity_kind'] | undefined) ?? null,
+        source_entity_id: (obj.source_entity_id as number | null | undefined) ?? null,
         race_mask: (obj.race_mask as number | null) ?? 0,
       };
       const list = sources.get(s.item_id);

@@ -130,9 +130,29 @@ function lootItems(r: LootRow, refMap: Map<number, number[]>): number[] {
   return r.item > 0 ? [r.item] : [];
 }
 
-// Shared reference loot tables are referenced by many creatures, so the same item gets
-// hundreds of sources. Keep the lowest-level few per item (dedup by source name+type).
+// A source's identity is its entity (npc/object/quest/item), not its display name:
+// faction-mirrored quests share a title but are distinct obtainable paths and must not
+// collapse. Rows that DO share an identity (one creature appearing in several loot groups)
+// merge non-destructively - reachability is the union of race masks, never a single survivor.
 const MAX_SOURCES_PER_ITEM = 12;
+
+function identityKey(s: ProjectedSource): string {
+  return s.source_entity_id != null
+    ? `${s.source_type}:${s.source_entity_kind}:${s.source_entity_id}`
+    : `${s.source_type}:${s.source_name}`;
+}
+
+function mergeSource(into: ProjectedSource, s: ProjectedSource): void {
+  into.race_mask = into.race_mask === 0 || s.race_mask === 0 ? 0 : into.race_mask | s.race_mask;
+  if ((s.source_min_level ?? 9999) < (into.source_min_level ?? 9999)) into.source_min_level = s.source_min_level;
+  if ((s.drop_chance ?? 0) > (into.drop_chance ?? 0)) into.drop_chance = s.drop_chance;
+  if (into.quest_choice_group == null && s.quest_choice_group != null) into.quest_choice_group = s.quest_choice_group;
+}
+
+function reachableBy(raceMask: number, factionMask: number): boolean {
+  return raceMask === 0 || (raceMask & factionMask) !== 0;
+}
+
 function capPerItem(all: ProjectedSource[]): ProjectedSource[] {
   const byItem = new Map<number, ProjectedSource[]>();
   for (const s of all) {
@@ -142,14 +162,22 @@ function capPerItem(all: ProjectedSource[]): ProjectedSource[] {
   }
   const out: ProjectedSource[] = [];
   for (const list of byItem.values()) {
-    const byName = new Map<string, ProjectedSource>();
+    const byIdentity = new Map<string, ProjectedSource>();
     for (const s of list) {
-      const key = `${s.source_type}|${s.source_name}`;
-      const ex = byName.get(key);
-      if (!ex || (s.source_min_level ?? 9999) < (ex.source_min_level ?? 9999)) byName.set(key, s);
+      const key = identityKey(s);
+      const ex = byIdentity.get(key);
+      if (ex) mergeSource(ex, s);
+      else byIdentity.set(key, { ...s });
     }
-    const uniq = [...byName.values()].sort((a, b) => (a.source_min_level ?? 9999) - (b.source_min_level ?? 9999));
-    for (let i = 0; i < uniq.length && i < MAX_SOURCES_PER_ITEM; i++) out.push(uniq[i]!);
+    const uniq = [...byIdentity.values()].sort((a, b) => (a.source_min_level ?? 9999) - (b.source_min_level ?? 9999));
+    const kept = uniq.slice(0, MAX_SOURCES_PER_ITEM);
+    for (const factionMask of [ALLIANCE_RACE_MASK, HORDE_RACE_MASK]) {
+      if (!uniq.some((s) => reachableBy(s.race_mask, factionMask))) continue;
+      if (kept.some((s) => reachableBy(s.race_mask, factionMask))) continue;
+      const rescue = uniq.find((s) => reachableBy(s.race_mask, factionMask) && !kept.includes(s));
+      if (rescue) kept.push(rescue);
+    }
+    for (const s of kept) out.push(s);
   }
   return out;
 }
@@ -367,6 +395,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
           drop_chance: chance,
           vendor_cost_copper: null,
           quest_choice_group: null,
+          source_entity_kind: 'npc',
+          source_entity_id: r.entry,
           race_mask: raceMask,
         });
         itemsCovered.add(item);
@@ -403,6 +433,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: null,
+          source_entity_kind: 'object',
+          source_entity_id: r.entry,
           race_mask: 0,
         });
         itemsCovered.add(item);
@@ -427,6 +459,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: null,
+          source_entity_kind: 'item',
+          source_entity_id: r.entry,
           race_mask: 0,
         });
         itemsCovered.add(item);
@@ -455,6 +489,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
         drop_chance: null,
         vendor_cost_copper: null,
         quest_choice_group: null,
+        source_entity_kind: 'npc',
+        source_entity_id: vendor,
         race_mask: creatureMapMask.get(vendor) ?? (c ? vendorRaceMask(factionAllow, c.faction) : 0),
       });
       itemsCovered.add(item);
@@ -507,6 +543,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: choiceGroup,
+          source_entity_kind: 'quest',
+          source_entity_id: questId,
           race_mask: questRaceMask,
         });
         itemsCovered.add(item);
@@ -523,6 +561,8 @@ export function readWorldSources(path: string, knownItems: Set<number>, itemReqL
           drop_chance: null,
           vendor_cost_copper: null,
           quest_choice_group: null,
+          source_entity_kind: 'quest',
+          source_entity_id: questId,
           race_mask: questRaceMask,
         });
         itemsCovered.add(item);

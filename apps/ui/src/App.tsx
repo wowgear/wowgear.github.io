@@ -151,7 +151,7 @@ export function App(): JSX.Element {
           </div>
         </main>
 
-        <ItemDetailsPanel picked={picked} expansion={state.expansion} />
+        <ItemDetailsPanel picked={picked} expansion={state.expansion} faction={state.faction} />
       </div>
     </div>
   );

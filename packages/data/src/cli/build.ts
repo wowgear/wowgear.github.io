@@ -85,6 +85,8 @@ interface RaidSourceRow {
   id: number;
   name: string;
   instance_id: number;
+  npc_id: number;
+  object_id: number;
 }
 interface InstanceRow {
   id: number;
@@ -120,7 +122,13 @@ function readThatsmybisSources(dir: string, knownItems: Set<number>): ProjectedS
   srcTable.rows.forEach((r, i) => {
     const o = rowToObject(srcTable, r);
     const id = i + SOURCE_ID_OFFSET;
-    sources.set(id, { id, name: String(o.name ?? ''), instance_id: Number(o.instance_id ?? 0) });
+    sources.set(id, {
+      id,
+      name: String(o.name ?? ''),
+      instance_id: Number(o.instance_id ?? 0),
+      npc_id: Number(o.npc_id ?? 0),
+      object_id: Number(o.object_id ?? 0),
+    });
   });
 
   const out: ProjectedSource[] = [];
@@ -141,6 +149,8 @@ function readThatsmybisSources(dir: string, knownItems: Set<number>): ProjectedS
       drop_chance: null,
       vendor_cost_copper: null,
       quest_choice_group: null,
+      source_entity_kind: src.npc_id > 0 ? 'npc' : src.object_id > 0 ? 'object' : null,
+      source_entity_id: src.npc_id > 0 ? src.npc_id : src.object_id > 0 ? src.object_id : null,
       race_mask: 0,
     });
   }
@@ -274,15 +284,17 @@ function main(): void {
   insertItems(keptItems);
 
   const insSrc = db.prepare(`
-    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group, race_mask)
-    VALUES ($item_id, $source_type, $source_name, $source_zone, $source_min_level, $drop_chance, $vendor_cost_copper, $quest_choice_group, $race_mask)
+    INSERT INTO item_sources (item_id, source_type, source_name, source_zone, source_min_level, drop_chance, vendor_cost_copper, quest_choice_group, source_entity_kind, source_entity_id, race_mask)
+    VALUES ($item_id, $source_type, $source_name, $source_zone, $source_min_level, $drop_chance, $vendor_cost_copper, $quest_choice_group, $source_entity_kind, $source_entity_id, $race_mask)
   `);
   const insertSrc = db.transaction((rows: ProjectedSource[]) => {
     for (const r of rows) insSrc.run({
       $item_id: r.item_id, $source_type: r.source_type, $source_name: r.source_name,
       $source_zone: r.source_zone, $source_min_level: r.source_min_level,
       $drop_chance: r.drop_chance, $vendor_cost_copper: r.vendor_cost_copper,
-      $quest_choice_group: r.quest_choice_group, $race_mask: r.race_mask,
+      $quest_choice_group: r.quest_choice_group,
+      $source_entity_kind: r.source_entity_kind ?? null, $source_entity_id: r.source_entity_id ?? null,
+      $race_mask: r.race_mask,
     });
   });
   insertSrc(sources);

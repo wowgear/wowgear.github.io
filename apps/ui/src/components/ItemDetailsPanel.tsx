@@ -1,4 +1,5 @@
-import type { ItemSource, RankedItem } from '@wowgear/core';
+import type { Faction, ItemSource, RankedItem } from '@wowgear/core';
+import { raceMaskAllows } from '@wowgear/core';
 import { ItemTooltip } from './ItemTooltip.js';
 import { sourceUrl } from '../wowhead.js';
 import type { Expansion } from '../urlState.js';
@@ -6,6 +7,7 @@ import type { Expansion } from '../urlState.js';
 interface Props {
   picked: RankedItem | null;
   expansion: Expansion;
+  faction: Faction;
 }
 
 function formatCopper(copper: number): string {
@@ -38,7 +40,7 @@ function dedupeSources(sources: ItemSource[]): ItemSource[] {
   });
 }
 
-export function ItemDetailsPanel({ picked, expansion }: Props): JSX.Element {
+export function ItemDetailsPanel({ picked, expansion, faction }: Props): JSX.Element {
   return (
     <aside className="w-[360px] shrink-0 bg-panel2 border-l border-black/40 flex flex-col">
       <div className="px-4 py-3 text-[10px] uppercase tracking-wide text-muted border-b border-black/40 shrink-0">
@@ -50,14 +52,14 @@ export function ItemDetailsPanel({ picked, expansion }: Props): JSX.Element {
           <p className="text-muted text-sm">Select an item to see details and sources</p>
         </div>
       ) : (
-        <Body picked={picked} expansion={expansion} />
+        <Body picked={picked} expansion={expansion} faction={faction} />
       )}
     </aside>
   );
 }
 
-function Body({ picked, expansion }: { picked: RankedItem; expansion: Expansion }): JSX.Element {
-  const sources = dedupeSources(picked.sources);
+function Body({ picked, expansion, faction }: { picked: RankedItem; expansion: Expansion; faction: Faction }): JSX.Element {
+  const sources = dedupeSources(picked.sources.filter((s) => raceMaskAllows(s.race_mask, faction)));
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="p-3 shrink-0">
@@ -69,7 +71,7 @@ function Body({ picked, expansion }: { picked: RankedItem; expansion: Expansion 
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-2">
         {sources.length === 0 && <div className="text-muted text-sm px-1">no known sources</div>}
         {sources.map((s, i) => {
-          const url = sourceUrl(expansion, s);
+          const url = sourceUrl(expansion, s, picked.item.id);
           return (
             <div key={i} className="bg-panel rounded p-2 text-sm">
               <div className="flex items-center justify-between">

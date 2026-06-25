@@ -253,6 +253,8 @@ export interface Item {
   expansion: 1 | 2;
 }
 
+export type SourceEntityKind = 'npc' | 'object' | 'quest' | 'item';
+
 export interface ItemSource {
   item_id: number;
   source_type: 'drop' | 'dungeon' | 'quest' | 'vendor' | 'profession' | 'craft' | 'pvp' | 'raid' | 'holiday';
@@ -262,6 +264,8 @@ export interface ItemSource {
   drop_chance: number | null;
   vendor_cost_copper: number | null;
   quest_choice_group: number | null;
+  source_entity_kind: SourceEntityKind | null;
+  source_entity_id: number | null;
   race_mask: number;
 }
 
