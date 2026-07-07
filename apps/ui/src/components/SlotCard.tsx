@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RankedItem } from '@wowgear/core';
+import { CopyButton } from './CopyButton.js';
 import { ItemTooltip } from './ItemTooltip.js';
 import type { Expansion } from '../urlState.js';
 
@@ -86,6 +87,10 @@ export function SlotCard({ label, list, picked, expansion, onPick, onSelect, dis
             <span className="text-[10px] font-mono text-muted shrink-0">{selected.score.toFixed(0)}</span>
           </div>
         </button>
+        <CopyButton
+          text={selected.item.name}
+          className="px-2 border-l border-black/40 hover:bg-black/30 flex items-center justify-center"
+        />
         {hasAlternatives && (
           <button
             type="button"

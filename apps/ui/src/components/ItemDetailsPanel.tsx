@@ -1,5 +1,6 @@
 import type { Faction, ItemSource, RankedItem } from '@wowgear/core';
 import { raceMaskAllows } from '@wowgear/core';
+import { CopyButton } from './CopyButton.js';
 import { ItemTooltip } from './ItemTooltip.js';
 import { sourceUrl } from '../wowhead.js';
 import type { Expansion } from '../urlState.js';
@@ -62,8 +63,9 @@ function Body({ picked, expansion, faction }: { picked: RankedItem; expansion: E
   const sources = dedupeSources(picked.sources.filter((s) => raceMaskAllows(s.race_mask, faction)));
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-3 shrink-0">
+      <div className="p-3 shrink-0 relative">
         <ItemTooltip item={picked.item} expansion={expansion} />
+        <CopyButton text={picked.item.name} className="absolute top-5 right-5 p-1" />
       </div>
       <div className="px-4 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted shrink-0">
         Sources
