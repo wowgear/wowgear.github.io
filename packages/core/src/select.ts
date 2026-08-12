@@ -39,10 +39,9 @@ const SLOT_GROUPS: Record<number, Slot[]> = {
   [SLOT.Ranged]:   [SLOT.Ranged, SLOT.RangedRight, SLOT.Thrown, SLOT.Relic],
 };
 
-function isEquippable(item: Item, charLevel: number, classBit: number, cls: ClassName, armorOk: ReadonlySet<number>, faction: Faction): boolean {
+function isEquippable(item: Item, charLevel: number, classBit: number, cls: ClassName, armorOk: ReadonlySet<number>): boolean {
   if (item.required_level > charLevel) return false;
   if (item.class_mask !== 0 && (item.class_mask & classBit) === 0) return false;
-  if (!raceMaskAllows(item.race_mask, faction)) return false;
   if (WEAPON_SLOTS.has(item.slot) && !ALLOWED_WEAPON_SUBCLASS[cls].has(item.subclass)) return false;
   if (ARMOR_SLOTS.has(item.slot) && !armorOk.has(item.subclass)) return false;
   if (item.slot === SLOT.Shield) {
@@ -59,10 +58,21 @@ function isEquippable(item: Item, charLevel: number, classBit: number, cls: Clas
   return true;
 }
 
+function minimumPlayerLevel(source: ItemSource, faction: Faction): number | null {
+  if (faction === 'alliance') return source.min_player_level_alliance;
+  if (faction === 'horde') return source.min_player_level_horde;
+  const alliance = source.min_player_level_alliance;
+  const horde = source.min_player_level_horde;
+  if (alliance == null) return horde;
+  if (horde == null) return alliance;
+  return Math.min(alliance, horde);
+}
+
 function isObtainable(sources: ItemSource[] | undefined, charLevel: number, faction: Faction): boolean {
   if (!sources || sources.length === 0) return false;
   for (const s of sources) {
-    if (s.source_min_level != null && s.source_min_level > charLevel) continue;
+    const minimumLevel = minimumPlayerLevel(s, faction);
+    if (minimumLevel == null || minimumLevel > charLevel) continue;
     if (!raceMaskAllows(s.race_mask, faction)) continue;
     return true;
   }
@@ -101,7 +111,7 @@ export function bestPerSlot(args: BestPerSlotArgs): Record<number, RankedItem[]>
   const armorOk = allowedArmorSubclass(charClass, charLevel);
 
   for (const item of items) {
-    if (!isEquippable(item, charLevel, classBit, charClass, armorOk, faction)) continue;
+    if (!isEquippable(item, charLevel, classBit, charClass, armorOk)) continue;
     const itemSources = sources.get(item.id);
     if (!isObtainable(itemSources, charLevel, faction)) continue;
 

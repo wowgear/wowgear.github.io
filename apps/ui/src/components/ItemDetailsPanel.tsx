@@ -23,8 +23,18 @@ function formatCopper(copper: number): string {
 }
 
 const SOURCE_ORDER: Record<ItemSource['source_type'], number> = {
-  quest: 0, vendor: 1, drop: 2, dungeon: 3, profession: 4, craft: 5, raid: 6, pvp: 7, holiday: 8,
+  quest: 0, vendor: 1, drop: 2, dungeon: 3, profession: 4, raid: 5, pvp: 6, holiday: 7,
 };
+
+function sourceMinimumLevel(source: ItemSource, faction: Faction): number | null {
+  if (faction === 'alliance') return source.min_player_level_alliance;
+  if (faction === 'horde') return source.min_player_level_horde;
+  const alliance = source.min_player_level_alliance;
+  const horde = source.min_player_level_horde;
+  if (alliance == null) return horde;
+  if (horde == null) return alliance;
+  return Math.min(alliance, horde);
+}
 
 function dedupeSources(sources: ItemSource[]): ItemSource[] {
   const seen = new Map<string, ItemSource>();
@@ -37,7 +47,7 @@ function dedupeSources(sources: ItemSource[]): ItemSource[] {
   return [...seen.values()].sort((a, b) => {
     const ord = SOURCE_ORDER[a.source_type] - SOURCE_ORDER[b.source_type];
     if (ord !== 0) return ord;
-    return (a.source_min_level ?? 0) - (b.source_min_level ?? 0);
+    return (sourceMinimumLevel(a, 'any') ?? 0) - (sourceMinimumLevel(b, 'any') ?? 0);
   });
 }
 
@@ -74,12 +84,13 @@ function Body({ picked, expansion, faction }: { picked: RankedItem; expansion: E
         {sources.length === 0 && <div className="text-muted text-sm px-1">no known sources</div>}
         {sources.map((s, i) => {
           const url = sourceUrl(expansion, s, picked.item.id);
+          const minimumLevel = sourceMinimumLevel(s, faction);
           return (
             <div key={i} className="bg-panel rounded p-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="capitalize text-yellow-300/90">{s.source_type}</span>
-                {s.source_min_level != null && (
-                  <span className="text-muted text-xs">lvl {s.source_min_level}+</span>
+                {minimumLevel != null && (
+                  <span className="text-muted text-xs">lvl {minimumLevel}+</span>
                 )}
               </div>
               {url ? (

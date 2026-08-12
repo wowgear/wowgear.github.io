@@ -242,25 +242,26 @@ export interface Item {
   quality: number;
   item_level: number;
   required_level: number;
+  required_skill: number;
+  required_skill_rank: number;
   slot: Slot;
   subclass: number;
   class_mask: number;
-  race_mask: number;
   stats: Stats;
   weapon_min_dmg: number | null;
   weapon_max_dmg: number | null;
   weapon_speed: number | null;
-  expansion: 1 | 2;
 }
 
 export type SourceEntityKind = 'npc' | 'object' | 'quest' | 'item';
 
 export interface ItemSource {
   item_id: number;
-  source_type: 'drop' | 'dungeon' | 'quest' | 'vendor' | 'profession' | 'craft' | 'pvp' | 'raid' | 'holiday';
+  source_type: 'drop' | 'dungeon' | 'quest' | 'vendor' | 'profession' | 'pvp' | 'raid' | 'holiday';
   source_name: string;
   source_zone: string | null;
-  source_min_level: number | null;
+  min_player_level_alliance: number | null;
+  min_player_level_horde: number | null;
   drop_chance: number | null;
   vendor_cost_copper: number | null;
   quest_choice_group: number | null;

@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProjectedItem } from './project.js';
 import { readEquipAuraStats } from './itemauras.js';
+import { professionMinPlayerLevel, type GateExpansion } from './professiongates.js';
 
 const ITEM_FLAG_CONJURED = 0x2;
 const ITEM_FLAG_DEPRECATED = 0x10;
-const ITEM_FLAG_PVP_REWARD = 0x1000;
 
 const STAT_TYPE_MAP: Record<number, string> = {
   3: 'agi', 4: 'str', 5: 'int', 6: 'spi', 7: 'sta',
@@ -113,7 +113,7 @@ function loadItemTable(path: string): Map<number, ItemMeta> {
   return out;
 }
 
-export function readWagoItems(dir: string): ProjectedItem[] {
+export function readWagoItems(dir: string, expansion: GateExpansion): ProjectedItem[] {
   const itemsByClass = loadItemTable(join(dir, 'Item.csv'));
 
   const buf = readFileSync(join(dir, 'ItemSparse.csv'), 'utf8');
@@ -144,13 +144,13 @@ export function readWagoItems(dir: string): ProjectedItem[] {
 
     const itemLevel = reader.num(cols, 'ItemLevel');
     const requiredLevel = reader.num(cols, 'RequiredLevel');
+    const requiredSkill = reader.num(cols, 'RequiredSkill');
+    const requiredSkillRank = reader.num(cols, 'RequiredSkillRank');
+    const professionMinLevel = professionMinPlayerLevel(expansion, requiredSkill, requiredSkillRank);
     const quality = reader.num(cols, 'OverallQualityID');
     const slot = reader.num(cols, 'InventoryType');
     const allowableClass = reader.num(cols, 'AllowableClass');
     const allowableRace = reader.num(cols, 'AllowableRace');
-    const requiredPvpRank = reader.num(cols, 'RequiredPVPRank');
-    const isPvp = (flags0 & ITEM_FLAG_PVP_REWARD) !== 0;
-
     const itemMeta = itemsByClass.get(id);
     const subclass = itemMeta?.subclassId ?? 0;
 
@@ -183,7 +183,10 @@ export function readWagoItems(dir: string): ProjectedItem[] {
       quality,
       item_level: itemLevel,
       required_level: requiredLevel,
-      required_honor_rank: requiredPvpRank > 0 ? requiredPvpRank : (isPvp ? 1 : 0),
+      required_skill: requiredSkill,
+      required_skill_rank: requiredSkillRank,
+      profession_min_level_alliance: professionMinLevel,
+      profession_min_level_horde: professionMinLevel,
       slot,
       subclass,
       class_mask: allowableClass < 0 ? 0 : allowableClass,
@@ -192,7 +195,6 @@ export function readWagoItems(dir: string): ProjectedItem[] {
       weapon_min_dmg: wmin > 0 ? wmin : null,
       weapon_max_dmg: wmax > 0 ? wmax : null,
       weapon_speed: speed,
-      expansion: 1,
       flags: flags0,
       duration,
     });

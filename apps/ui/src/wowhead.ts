@@ -25,7 +25,6 @@ const ITEM_TAB_BY_SOURCE: Partial<Record<ItemSource['source_type'], string>> = {
   vendor: 'sold-by',
   pvp: 'sold-by',
   profession: 'created-by-spell',
-  craft: 'created-by-spell',
 };
 
 function searchUrl(expansion: Expansion, source: ItemSource): string {

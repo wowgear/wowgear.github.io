@@ -25,17 +25,17 @@ It is a fully static single-page app: the entire item database ships as a SQLite
 ## How it works
 
 ```
-build time (Bun)                          run time (browser)
-----------------                          ------------------
-external game DBs ─┐                       fetch /<exp>.sqlite
-  cmangos world    ├─> @wowgear/data ──>   sql.js (WASM) loads it
-  wago DBC CSVs    │   build.ts            loadAll() -> items + sources in memory
-  thatsmybis raid ─┘   |                   @wowgear/core scores + ranks per slot
-                       v                   React paper-doll renders top picks
-            apps/ui/public/<exp>.sqlite
+build time (Bun)                       run time (browser)
+----------------                       ------------------
+Wago client tables --+                 fetch /<exp>.sqlite
+                     +-> data build -> sql.js loads the flat gear table
+All The Things ------+                 group rows by item and source
+                     |                 score and render top picks
+                     v
+         apps/ui/public/<exp>.sqlite
 ```
 
-At build time, `@wowgear/data` ingests external game-data dumps, normalizes them into a two-table schema (`items`, `item_sources`), prunes junk, derives where each item comes from, and emits one SQLite file per expansion into `apps/ui/public/`.
+At build time, `@wowgear/data` reads Wago item data and All The Things acquisition graphs, resolves profession, quest, faction, and container gates, and emits one denormalized `gear` row per item-source path into `apps/ui/public/`.
 
 At run time, the UI loads `sql.js` (WASM SQLite) from a CDN, fetches the chosen `.sqlite` asset once, reads every row into memory, and calls `@wowgear/core` to compute the per-slot rankings. All "best at level X" logic is pure and client-side.
 
@@ -111,10 +111,8 @@ Each script invokes `src/cli/build.ts` with hard-coded source paths under `/tmp/
 ```bash
 bun run packages/data/src/cli/build.ts \
   --expansion=<vanilla|tbc|wotlk> \
-  --world <cmangos-world.sql> \
-  [--wago <wago-dbc-csv-dir>] \
-  [--dump <items.sql>] \
-  [--thatsmybis <dir>] \
+  --wago <wago-dbc-csv-dir> \
+  --att <AllTheThings-dir> \
   [--out <path>]            # defaults to apps/ui/public/<expansion>.sqlite
 ```
 
@@ -124,11 +122,10 @@ These are fetched by hand into `/tmp/agents/` (ephemeral; re-fetch as needed). T
 
 | Path | Source | How obtained |
 | --- | --- | --- |
-| `/tmp/agents/{classic,tbc,wotlk}-db/` | cmangos world DBs (`github.com/cmangos/{classic,tbc,wotlk}-db`) | `git clone --depth=1`, then `gunzip Full_DB/*.sql.gz` |
-| `/tmp/agents/burning-crusade-item-db/` | `github.com/thatsmybis/burning-crusade-item-db` | `git clone` (TBC raid boss -> item mapping only) |
-| `/tmp/agents/wago/<exp>/*.csv` | [wago.tools](https://wago.tools) DBC exports | `curl 'https://wago.tools/db2/<Table>/csv?build=<build>'` |
+| `/tmp/agents/wago/<exp>/*.csv` | [wago.tools](https://wago.tools) client-table exports | Fetch the exact build's `Item`, `ItemSparse`, `ItemEffect`, and `SpellEffect` CSVs. |
+| `/tmp/agents/AllTheThings-b90391c0ae7c3f8b730eeb874a0926e168a07d89/` | All The Things | Extract the archive for immutable commit `b90391c0ae7c3f8b730eeb874a0926e168a07d89`. |
 
-Pinned wago builds (bump these when a new Classic patch ships): vanilla `1.15.8.67156`, tbc `2.5.4.44833`, wotlk `3.4.5.63697`.
+Pinned Wago builds: vanilla `1.15.8.67156`, TBC `2.5.6.68775`, WotLK `3.4.5.63697`. Full fetch commands and the data contract are in `packages/data/README.md`.
 
 ---
 
@@ -138,7 +135,7 @@ Recommendations are a **weighted sum**, not a simulation.
 
 - `scoreItem(item, weights)` sums each stat times its weight, plus a weapon-DPS term (`(min+max)/2 / speed * weapon_dps`).
 - Weights live in `packages/core/src/weights.ts`, indexed by expansion, class, spec, and level bucket (`1-19` ... `70-80`). TBC/WotLK use combat-rating keys; the vanilla set is derived from them into flat-percentage keys (`crit_pct`, `hit_pct`, ...) because vanilla items predate the rating system. Hand-curated and unnormalized - only relative magnitude matters.
-- `bestPerSlot()` filters to items that are **equippable** (level, class, race/faction, armor/weapon subclass) and **obtainable** (at least one source reachable at the current level and faction), groups inventory slots into display slots (e.g. main-hand competes with two-handers), dedupes quest-choice alternatives, and returns the top 3 per slot.
+- `bestPerSlot()` filters to items that are **equippable** (level, class, armor/weapon subclass) and **obtainable** (at least one source row whose precomputed faction level is reachable), groups inventory slots into display slots (e.g. main-hand competes with two-handers), dedupes quest-choice alternatives, and returns the top 3 per slot.
 
 "Best at level X" means equippable now **and** obtainable now - no level-46 dungeon drops in a level-22 list.
 
@@ -166,10 +163,9 @@ All character state is encoded in the URL query string, so any configuration is 
 
 ## Notes for contributors
 
-- **No tests or lint yet.** The `test` scripts (`bun test`) and the root `lint` script are placeholders; there are currently no test files and sub-packages define no `lint` script.
-- **`Item.expansion` (`1 | 2`) is vestigial.** It is parsed and stored but never read - all real expansion logic keys off the active DB file / the `expansion` URL param. Do not rely on it.
-- **The `source_type` union has a dead member, `'craft'`.** The real ingestion pipeline never emits it - crafted items are tagged `'profession'`. Only `packages/data/src/cli/fixture.ts` produces `'craft'`, and the UI has no filter for it (just a leftover sort-order entry). The eight types listed above are the ones that actually appear in the shipped databases.
-- The data pipeline's SQL/CSV parsers in `packages/data/src` are hand-written (no external parser dependency); they target the specific shapes of the cmangos and wago dumps.
+- Acquisition paths are flattened during the data build. Runtime code must not reconstruct quest or container relationships.
+- Crafted items use the `profession` source type.
+- The data pipeline's CSV and generated-Lua parsers are hand-written and introduce no parser dependency.
 
 ---
 

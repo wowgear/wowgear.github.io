@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build:db": "bun run src/cli/build.ts",
-    "build:vanilla": "bun run src/cli/build.ts --expansion=vanilla --world /tmp/agents/classic-db/Full_DB/ClassicDB_1_12_1_z2815.sql --wago /tmp/agents/wago/vanilla",
-    "build:tbc": "bun run src/cli/build.ts --expansion=tbc --dump /tmp/agents/burning-crusade-item-db/db/unmodified.sql --thatsmybis /tmp/agents/burning-crusade-item-db/thatsmybis --world /tmp/agents/tbc-db/Full_DB/TBCDB_1.10.0_ReturnOfTheVengeance.sql --wago /tmp/agents/wago/tbc",
-    "build:wotlk": "bun run src/cli/build.ts --expansion=wotlk --world /tmp/agents/wotlk-db/Full_DB/WoTLKDB_1_9_14092.sql --wago /tmp/agents/wago/wotlk",
+    "build:vanilla": "bun run src/cli/build.ts --expansion=vanilla --wago /tmp/agents/wago/vanilla --att /tmp/agents/AllTheThings-b90391c0ae7c3f8b730eeb874a0926e168a07d89",
+    "build:tbc": "bun run src/cli/build.ts --expansion=tbc --wago /tmp/agents/wago/tbc --att /tmp/agents/AllTheThings-b90391c0ae7c3f8b730eeb874a0926e168a07d89",
+    "build:wotlk": "bun run src/cli/build.ts --expansion=wotlk --wago /tmp/agents/wago/wotlk --att /tmp/agents/AllTheThings-b90391c0ae7c3f8b730eeb874a0926e168a07d89",
     "build:all": "pnpm build:vanilla && pnpm build:tbc && pnpm build:wotlk",
     "fixture": "bun run src/cli/fixture.ts",
     "test": "bun test"
@@ -20,4 +20,3 @@
     "typescript": "^5.6.3"
   }
 }
-
